@@ -1,7 +1,7 @@
 # library-restaurant-system
 
 - Claude給我的架構但我懶得動了
-
+- 要開Edit才看的到排版
   - DatabaseManager   →   負責開門（連線）
   - BookRepository    →   負責去拿東西（SQL）
   - BookService       →   負責決定要拿什麼（邏輯）
