@@ -1,3 +1,5 @@
+package library.model;
+
 public class Fine {
     private int fineId;
     private BorrowRecord record;

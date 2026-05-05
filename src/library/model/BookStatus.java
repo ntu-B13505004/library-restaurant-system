@@ -1,3 +1,5 @@
+package library.model;
+
 public enum BookStatus {
     AVAILABLE,    // 可借閱
     BORROWED,     // 已借出

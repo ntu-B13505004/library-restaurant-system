@@ -1,3 +1,4 @@
+package library.model;
 import java.time.LocalDateTime;
 
 public class BorrowRecord {
@@ -6,7 +7,7 @@ public class BorrowRecord {
     private Book book;
     private LocalDateTime borrowDate;
     private LocalDateTime dueDate;
-    private LocalDateTime returnDate; // null 代表還沒還
+    private LocalDateTime returnDate;                          //null->沒還
     private boolean isOverdue;
 
     public BorrowRecord(int recordId, User user, Book book) {
@@ -14,14 +15,14 @@ public class BorrowRecord {
         this.user = user;
         this.book = book;
         this.borrowDate = LocalDateTime.now();
-        this.dueDate = borrowDate.plusDays(14); // 借期兩週
+        this.dueDate = borrowDate.plusDays(14);         //借期兩週
         this.returnDate = null;
         this.isOverdue = false;
     }
 
     public void markReturned() {
         this.returnDate = LocalDateTime.now();
-        checkOverdue(); // 還書時順便判斷有沒有逾期
+        checkOverdue();                                     //還書時check逾期
     }
 
     public boolean checkOverdue() {
