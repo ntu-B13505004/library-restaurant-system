@@ -17,11 +17,11 @@ public class DataLoader {
 
     public static void loadInitialData() {
         if (isDataExists()) {
-            System.out.println("ℹ️ 資料庫已有數據，跳過 JSON 導入。");
+            System.out.println("資料庫已有數據，跳過 JSON 導入。");
             return;
         }
 
-        System.out.println("⏳ 開始依據專題簡報規格導入使用者、書籍（含ISBN拆表）與借閱歷史...");
+        System.out.println("開始依據專題簡報規格導入使用者、書籍（含ISBN拆表）與借閱歷史...");
 
         // 調整 try 結構，讓 conn 變數在 catch 區塊中也能被存取，以便安全執行 rollback()
         try (Connection conn = DatabaseManager.getConnection()) {
