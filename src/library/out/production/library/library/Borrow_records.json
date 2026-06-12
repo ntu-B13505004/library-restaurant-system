@@ -1,0 +1,272 @@
+[
+  {
+    "user_id": 5,
+    "book_id": 23,
+    "borrow_date": "-45 days",
+    "due_date": "-38 days",
+    "return_date": "-42 days",
+    "borrow_days": 7,
+    "created_at": "-45 days"
+  },
+  {
+    "user_id": 12,
+    "book_id": 78,
+    "borrow_date": "-28 days",
+    "due_date": "-27 days",
+    "return_date": "-29 days",
+    "borrow_days": 1,
+    "created_at": "-28 days"
+  },
+  {
+    "user_id": 8,
+    "book_id": 112,
+    "borrow_date": "-12 days",
+    "due_date": "-5 days",
+    "return_date": "-6 days",
+    "borrow_days": 7,
+    "created_at": "-12 days"
+  },
+  {
+    "user_id": 3,
+    "book_id": 156,
+    "borrow_date": "-30 days",
+    "due_date": "-23 days",
+    "return_date": "-22 days",
+    "borrow_days": 7,
+    "created_at": "-30 days"
+  },
+  {
+    "user_id": 19,
+    "book_id": 41,
+    "borrow_date": "-55 days",
+    "due_date": "-52 days",
+    "return_date": "-56 days",
+    "borrow_days": 3,
+    "created_at": "-55 days"
+  },
+  {
+    "user_id": 7,
+    "book_id": 89,
+    "borrow_date": "-10 days",
+    "due_date": "-3 days",
+    "return_date": "-5 days",
+    "borrow_days": 7,
+    "created_at": "-10 days"
+  },
+  {
+    "user_id": 14,
+    "book_id": 134,
+    "borrow_date": "-50 days",
+    "due_date": "-43 days",
+    "return_date": "-42 days",
+    "borrow_days": 7,
+    "created_at": "-50 days"
+  },
+  {
+    "user_id": 1,
+    "book_id": 177,
+    "borrow_date": "-22 days",
+    "due_date": "-19 days",
+    "return_date": "-23 days",
+    "borrow_days": 3,
+    "created_at": "-22 days"
+  },
+  {
+    "user_id": 20,
+    "book_id": 5,
+    "borrow_date": "-35 days",
+    "due_date": "-28 days",
+    "return_date": "-30 days",
+    "borrow_days": 7,
+    "created_at": "-35 days"
+  },
+  {
+    "user_id": 9,
+    "book_id": 62,
+    "borrow_date": "-18 days",
+    "due_date": "-11 days",
+    "return_date": "-13 days",
+    "borrow_days": 7,
+    "created_at": "-18 days"
+  },
+  {
+    "user_id": 2,
+    "book_id": 109,
+    "borrow_date": "-6 days",
+    "due_date": "1 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-6 days"
+  },
+  {
+    "user_id": 15,
+    "book_id": 44,
+    "borrow_date": "-3 days",
+    "due_date": "4 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-3 days"
+  },
+  {
+    "user_id": 11,
+    "book_id": 87,
+    "borrow_date": "-9 days",
+    "due_date": "-2 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-9 days"
+  },
+  {
+    "user_id": 4,
+    "book_id": 125,
+    "borrow_date": "-1 days",
+    "due_date": "6 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-1 days"
+  },
+  {
+    "user_id": 18,
+    "book_id": 150,
+    "borrow_date": "-13 days",
+    "due_date": "-6 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-13 days"
+  },
+  {
+    "user_id": 6,
+    "book_id": 169,
+    "borrow_date": "-4 days",
+    "due_date": "-1 days",
+    "return_date": null,
+    "borrow_days": 3,
+    "created_at": "-4 days"
+  },
+  {
+    "user_id": 13,
+    "book_id": 33,
+    "borrow_date": "-7 days",
+    "due_date": "0 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-7 days"
+  },
+  {
+    "user_id": 16,
+    "book_id": 71,
+    "borrow_date": "-2 days",
+    "due_date": "5 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-2 days"
+  },
+  {
+    "user_id": 10,
+    "book_id": 98,
+    "borrow_date": "-5 days",
+    "due_date": "-4 days",
+    "return_date": null,
+    "borrow_days": 1,
+    "created_at": "-5 days"
+  },
+  {
+    "user_id": 17,
+    "book_id": 183,
+    "borrow_date": "-11 days",
+    "due_date": "-4 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-11 days"
+  },
+  {
+    "user_id": 2,
+    "book_id": 114,
+    "borrow_date": "-25 days",
+    "due_date": "-18 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-25 days"
+  },
+  {
+    "user_id": 7,
+    "book_id": 56,
+    "borrow_date": "-30 days",
+    "due_date": "-23 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-30 days"
+  },
+  {
+    "user_id": 14,
+    "book_id": 192,
+    "borrow_date": "-18 days",
+    "due_date": "-11 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-18 days"
+  },
+  {
+    "user_id": 9,
+    "book_id": 13,
+    "borrow_date": "-40 days",
+    "due_date": "-33 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-40 days"
+  },
+  {
+    "user_id": 1,
+    "book_id": 81,
+    "borrow_date": "-22 days",
+    "due_date": "-15 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-22 days"
+  },
+  {
+    "user_id": 20,
+    "book_id": 129,
+    "borrow_date": "-35 days",
+    "due_date": "-28 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-35 days"
+  },
+  {
+    "user_id": 5,
+    "book_id": 162,
+    "borrow_date": "-28 days",
+    "due_date": "-21 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-28 days"
+  },
+  {
+    "user_id": 12,
+    "book_id": 190,
+    "borrow_date": "-16 days",
+    "due_date": "-9 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-16 days"
+  },
+  {
+    "user_id": 3,
+    "book_id": 47,
+    "borrow_date": "-45 days",
+    "due_date": "-38 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-45 days"
+  },
+  {
+    "user_id": 19,
+    "book_id": 104,
+    "borrow_date": "-19 days",
+    "due_date": "-12 days",
+    "return_date": null,
+    "borrow_days": 7,
+    "created_at": "-19 days"
+  }
+]

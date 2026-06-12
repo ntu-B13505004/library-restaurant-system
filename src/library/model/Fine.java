@@ -1,37 +1,75 @@
 package library.model;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
 public class Fine {
     private int fineId;
-    private BorrowRecord record;
-    private int amount;
+    private BorrowRecord record; // 關聯的借閱紀錄
+    private int amount;          // 若已結清，記錄當時繳納的金額；若未結清，則作為快照緩存
     private boolean isPaid;
 
-    private static final int DAILY_FINE = 10;       //暫定每天10塊
+    private static final int DAILY_FINE = 10; // 每天 10 元
 
+    /**
+     * 從資料庫撈出已存在罰款紀錄時使用的建構子
+     */
+    public Fine(int fineId, BorrowRecord record, int amount, boolean isPaid) {
+        this.fineId = fineId;
+        this.record = record;
+        this.amount = amount;
+        this.isPaid = isPaid;
+    }
+
+    /**
+     * 新生成罰款紀錄時使用的建構子（預設未繳清）
+     */
     public Fine(int fineId, BorrowRecord record) {
         this.fineId = fineId;
         this.record = record;
         this.isPaid = false;
-        this.amount = calculateAmount();
+        this.amount = calculateCurrentAmount();
     }
 
-    public int calculateAmount() {
-        if (!record.isOverdue()) return 0;
+    /**
+     * ✨ 動態計算最新應繳金額
+     */
+    public int calculateCurrentAmount() {
+        if (record == null || !record.isOverdue()) return 0;
 
-        long overdueDays = java.time.temporal.ChronoUnit.DAYS.between(
-            record.getDueDate(),
-            record.getReturnDate() != null ? record.getReturnDate() : java.time.LocalDateTime.now()
-        );
-        return (int) overdueDays * DAILY_FINE;
+        // 如果書已經還了，就計算到「歸還當天」；如果還沒還，就動態計算到「此時此刻」
+        LocalDateTime endPoint = (record.getReturnDate() != null)
+                ? record.getReturnDate()
+                : LocalDateTime.now();
+
+        long overdueDays = ChronoUnit.DAYS.between(record.getDueDate(), endPoint);
+
+        // 確保不會出現負數天數
+        return overdueDays > 0 ? (int) overdueDays * DAILY_FINE : 0;
     }
 
+    /**
+     * ✨ 修改此 Getter：確保未繳清前，每次 GUI 刷新看到的都是最新累積的罰金
+     */
+    public int getAmount() {
+        if (!isPaid) {
+            // 還沒付錢前，金額隨時間動態與時俱進
+            this.amount = calculateCurrentAmount();
+        }
+        return amount;
+    }
+
+    /**
+     * 執行繳款
+     */
     public void pay() {
+        // 繳款當下，鎖定最終的罰金金額
+        this.amount = calculateCurrentAmount();
         this.isPaid = true;
     }
 
-    // Getters
+    // 其他 Getters
     public int getFineId() { return fineId; }
     public BorrowRecord getRecord() { return record; }
-    public int getAmount() { return amount; }
     public boolean isPaid() { return isPaid; }
 }
