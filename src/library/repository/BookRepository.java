@@ -3,6 +3,8 @@ package library.repository;
 import library.database.DatabaseManager;
 import library.model.Book;
 import library.model.BookStatus;
+import library.model.BorrowRecord;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -106,7 +108,6 @@ public class BookRepository {
         }
         return null;
     }
-
     /**
      * ✨ 亮點功能：跨資料表模糊關鍵字搜尋 (為 GUI 搜尋框量身打造)
      * 支援同時檢索：書名、作者、主題、以及該書名下的任一條 ISBN！
@@ -117,7 +118,7 @@ public class BookRepository {
         // 使用 DISTINCT 與 LEFT JOIN 確保關鍵字撞到多個 ISBN 時不會產生重複的 Book 物件
         String sql = "SELECT DISTINCT b.*, i.isbn FROM books b " +
                 "LEFT JOIN book_isbns i ON b.book_id = i.book_id " +
-                "WHERE b.title LIKE ? OR b.authors LIKE ? OR b.subjects LIKE ? OR i.isbn LIKE ?";
+                "WHERE b.title LIKE ? OR b.authors LIKE ? OR b.subjects LIKE ? OR b.publisher LIKE ?OR i.isbn LIKE ?";
 
         String matchKey = "%" + keyword + "%";
 
@@ -128,6 +129,7 @@ public class BookRepository {
             pstmt.setString(2, matchKey);
             pstmt.setString(3, matchKey);
             pstmt.setString(4, matchKey);
+            pstmt.setString(5, matchKey);
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -201,5 +203,13 @@ public class BookRepository {
             System.err.println("⚠️ 查詢書籍 ISBN 失敗，Book ID: " + bookId);
         }
         return isbns;
+    }
+    public boolean updateStatusInTransaction(Connection conn, int bookId, String status) throws SQLException {
+        String sql = "UPDATE books SET status = ? WHERE book_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, status);
+            pstmt.setInt(2, bookId);
+            return pstmt.executeUpdate() > 0;
+        }
     }
 }

@@ -34,18 +34,6 @@ public class Book {
         this.isbns = new ArrayList<>();     // 初始化 List 避免 NullPointerException
     }
 
-    // 💡 保留舊版 4 欄位建構子（自由選擇保留，若其他測試程式有用到可防呆）
-    public Book(int bookId, String title, String author, String isbn) {
-        this.bookId = bookId;
-        this.title = title;
-        this.authors = author;
-        this.status = BookStatus.AVAILABLE;
-        this.isbns = new ArrayList<>();
-        if (isbn != null) {
-            this.isbns.add(isbn);
-        }
-    }
-
     public boolean isAvailable() {
         return this.status == BookStatus.AVAILABLE;
     }

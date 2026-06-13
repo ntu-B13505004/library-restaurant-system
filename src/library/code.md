@@ -1,12 +1,14 @@
-Library
+datebase
+DatabaseManager
+package library.database;
 
-1. Datebase
+import java.sql.*;
+
 public class DatabaseManager {
 private static final String URL = "jdbc:sqlite:library.db";
 
     public static Connection getConnection() throws SQLException {
         Connection conn = DriverManager.getConnection(URL);
-        // 💡 專業提示：SQLite 預設不會強制檢查外鍵限制，Demo 時執行這行可以開啟外鍵功能，確保資料完整性
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("PRAGMA foreign_keys = ON;");
         }
@@ -16,40 +18,38 @@ private static final String URL = "jdbc:sqlite:library.db";
     public static void initializeDatabase() {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
 
-            // 1. 建立使用者表 (對應簡報 Page 18 與 User.java)
+            // 1. 建立使用者表
             stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
                     "user_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "student_no TEXT UNIQUE NOT NULL, " + // 學號欄位
+                    "student_no TEXT UNIQUE NOT NULL, " +
                     "name TEXT NOT NULL, " +
                     "password TEXT NOT NULL, " +
                     "role_level TEXT, " +             // NORMAL / VIP / ADMIN
                     "status TEXT, " +                 // ACTIVE / SUSPENDED
                     "created_at TEXT)");
 
-            // 2. 建立書籍表 (對應簡報 Page 20 與 Book.java)
-            // 💡 注意：依據規範已將單一 isbn 欄位移除
+            // 2. 建立書籍表
             stmt.execute("CREATE TABLE IF NOT EXISTS books (" +
                     "book_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "title TEXT NOT NULL, " +
-                    "authors TEXT, " +                // 複數作者字串
-                    "subjects TEXT, " +               // 主題
-                    "publisher TEXT, " +              // 出版者
-                    "publish_year TEXT, " +           // 出版年
-                    "edition TEXT, " +                // 版本
-                    "format_desc TEXT, " +            // 格式描述
-                    "source TEXT, " +                 // 資料來源
-                    "note TEXT, " +                   // 附註
+                    "authors TEXT, " +
+                    "subjects TEXT, " +
+                    "publisher TEXT, " +
+                    "publish_year TEXT, " +
+                    "edition TEXT, " +
+                    "format_desc TEXT, " +
+                    "source TEXT, " +
+                    "note TEXT, " +
                     "status TEXT)");                  // AVAILABLE / BORROWED
 
-            // 3. 建立書籍 ISBN 表 (✨ 核心修改：對應簡報 Page 21 的一對多拆表)
+            // 3. 建立書籍 ISBN 表
             stmt.execute("CREATE TABLE IF NOT EXISTS book_isbns (" +
                     "isbn_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "book_id INTEGER, " +
                     "isbn TEXT NOT NULL, " +
                     "FOREIGN KEY(book_id) REFERENCES books(book_id) ON DELETE CASCADE)");
 
-            // 4. 建立借閱紀錄表 (對應簡報 Page 22 與 BorrowRecord.java)
-            // 💡 注意：依據規範，移除 is_overdue 欄位，改納入 borrow_days 與 created_at
+            // 4. 建立借閱紀錄表
             stmt.execute("CREATE TABLE IF NOT EXISTS borrow_records (" +
                     "record_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "user_id INTEGER, " +
@@ -57,20 +57,41 @@ private static final String URL = "jdbc:sqlite:library.db";
                     "borrow_date TEXT, " +
                     "due_date TEXT, " +
                     "return_date TEXT, " +
-                    "borrow_days INTEGER, " +          // 租借天數
-                    "created_at TEXT, " +             // 紀錄建立時間
+                    "borrow_days INTEGER, " +
+                    "created_at TEXT, " +
                     "FOREIGN KEY(user_id) REFERENCES users(user_id), " +
                     "FOREIGN KEY(book_id) REFERENCES books(book_id))");
 
-            // 5. 建立罰款表 (對應 Fine.java，保留作為實作功能亮點)
+            // 5. 建立罰款表（💡 修正：更新欄位以完美配合您的 BorrowService.returnBook 罰金儲存規格）
             stmt.execute("CREATE TABLE IF NOT EXISTS fines (" +
                     "fine_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "record_id INTEGER, " +
                     "amount INTEGER, " +
-                    "is_paid INTEGER, " +
+                    "status TEXT, " +                  // UNPAID / PAID
+                    "created_at TEXT, " +
                     "FOREIGN KEY(record_id) REFERENCES borrow_records(record_id) ON DELETE CASCADE)");
 
             System.out.println("📊 SQLite 資料表完全依據專題簡報規格初始化/檢查完成。");
+
+            // 🚩 ✨ 新增：自動檢查並建置系統預設管理員（Data Seeding）
+            String checkAdminSql = "SELECT COUNT(*) FROM users WHERE role_level = 'ADMIN'";
+            try (ResultSet rs = stmt.executeQuery(checkAdminSql)) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    String insertAdminSql = "INSERT INTO users (student_no, name, password, role_level, status, created_at) VALUES (?, ?, ?, ?, ?, ?)";
+                    try (PreparedStatement pstmt = conn.prepareStatement(insertAdminSql)) {
+                        pstmt.setString(1, "ADMIN001"); // 管理員學號（登入帳號）
+                        pstmt.setString(2, "系統管理員");
+                        pstmt.setString(3, "admin123"); // 預設密碼
+                        pstmt.setString(4, library.model.UserRole.ADMIN.name());   // "ADMIN"
+                        pstmt.setString(5, library.model.UserStatus.ACTIVE.name()); // "ACTIVE"
+                        pstmt.setString(6, java.time.LocalDateTime.now().toString());
+
+                        pstmt.executeUpdate();
+                        System.out.println("🚩 系統成功自動內建管理員帳號：[ ADMIN001 ]，密碼：[ admin123 ]");
+                    }
+                }
+            }
+
         } catch (SQLException e) {
             System.err.println("❌ 資料庫初始化失敗！");
             e.printStackTrace();
@@ -78,6 +99,7 @@ private static final String URL = "jdbc:sqlite:library.db";
     }
 }
 
+DataLoader
 package library.database;
 
 import library.model.BookStatus;
@@ -167,8 +189,9 @@ private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("
                     pstmt.setString(1, studentNo);
                     pstmt.setString(2, name);
                     pstmt.setString(3, password);
-                    pstmt.setString(4, roleLevel != null ? roleLevel : "NORMAL");
-                    pstmt.setString(5, status != null ? status : "ACTIVE");
+                    // 💡 優化：寫入前強制轉大寫，確保符合 Enum 規格
+                    pstmt.setString(4, roleLevel != null ? roleLevel.toUpperCase().trim() : "NORMAL");
+                    pstmt.setString(5, status != null ? status.toUpperCase().trim() : "ACTIVE");
                     pstmt.setString(6, createdAt != null ? createdAt : LocalDateTime.now().format(formatter));
 
                     pstmt.addBatch();
@@ -177,7 +200,6 @@ private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("
             }
         }
     }
-
     private static void importBooks(Connection conn) throws Exception {
         Gson gson = new Gson();
         try (FileReader reader = new FileReader("Books.json")) {
@@ -337,101 +359,113 @@ private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("
     }
 }
 
-2. model
-   public class Book {
-   private int bookId;
-   private String title;
-   private String authors;       // 配合新 DB：改為複數型欄位
-   private String subjects;      // 主題
-   private String publisher;     // 出版者
-   private String publishYear;   // 出版日期/年
-   private String edition;       // 版本
-   private String formatDesc;    // 格式
-   private String source;        // 資料來源
-   private String note;          // 附註
-   private BookStatus status;
-   private List<String> isbns;   // 配合新 DB：一對多拆表，改用 List 儲存複數 ISBN
+model
+Book
+package library.model;
 
-   // ✨ 完整欄位建構子：供新版 BookRepository 使用
-   public Book(int bookId, String title, String authors, String subjects, String publisher,
-   String publishYear, String edition, String formatDesc, String source, String note) {
-   this.bookId = bookId;
-   this.title = title;
-   this.authors = authors;
-   this.subjects = subjects;
-   this.publisher = publisher;
-   this.publishYear = publishYear;
-   this.edition = edition;
-   this.formatDesc = formatDesc;
-   this.source = source;
-   this.note = note;
-   this.status = BookStatus.AVAILABLE; // 預設可借
-   this.isbns = new ArrayList<>();     // 初始化 List 避免 NullPointerException
-   }
+import java.util.ArrayList;
+import java.util.List;
 
-   // 💡 保留舊版 4 欄位建構子（自由選擇保留，若其他測試程式有用到可防呆）
-   public Book(int bookId, String title, String author, String isbn) {
-   this.bookId = bookId;
-   this.title = title;
-   this.authors = author;
-   this.status = BookStatus.AVAILABLE;
-   this.isbns = new ArrayList<>();
-   if (isbn != null) {
-   this.isbns.add(isbn);
-   }
-   }
+public class Book {
+private int bookId;
+private String title;
+private String authors;       // 配合新 DB：改為複數型欄位
+private String subjects;      // 主題
+private String publisher;     // 出版者
+private String publishYear;   // 出版日期/年
+private String edition;       // 版本
+private String formatDesc;    // 格式
+private String source;        // 資料來源
+private String note;          // 附註
+private BookStatus status;
+private List<String> isbns;   // 配合新 DB：一對多拆表，改用 List 儲存複數 ISBN
 
-   public boolean isAvailable() {
-   return this.status == BookStatus.AVAILABLE;
-   }
+    // ✨ 完整欄位建構子：供新版 BookRepository 使用
+    public Book(int bookId, String title, String authors, String subjects, String publisher,
+                String publishYear, String edition, String formatDesc, String source, String note) {
+        this.bookId = bookId;
+        this.title = title;
+        this.authors = authors;
+        this.subjects = subjects;
+        this.publisher = publisher;
+        this.publishYear = publishYear;
+        this.edition = edition;
+        this.formatDesc = formatDesc;
+        this.source = source;
+        this.note = note;
+        this.status = BookStatus.AVAILABLE; // 預設可借
+        this.isbns = new ArrayList<>();     // 初始化 List 避免 NullPointerException
+    }
 
-   // 填滿原本空著的 Setter
-   public void setStatus(BookStatus status) {
-   this.status = status;
-   }
+    // 💡 保留舊版 4 欄位建構子（自由選擇保留，若其他測試程式有用到可防呆）
+    public Book(int bookId, String title, String author, String isbn) {
+        this.bookId = bookId;
+        this.title = title;
+        this.authors = author;
+        this.status = BookStatus.AVAILABLE;
+        this.isbns = new ArrayList<>();
+        if (isbn != null) {
+            this.isbns.add(isbn);
+        }
+    }
 
-   public void setIsbns(List<String> isbns) {
-   this.isbns = isbns;
-   }
+    public boolean isAvailable() {
+        return this.status == BookStatus.AVAILABLE;
+    }
 
-   // 實用方法：方便一筆一筆加入自 book_isbns 表撈出來的資料
-   public void addIsbn(String isbn) {
-   if (this.isbns == null) {
-   this.isbns = new ArrayList<>();
-   }
-   this.isbns.add(isbn);
-   }
+    // 填滿原本空著的 Setter
+    public void setStatus(BookStatus status) {
+        this.status = status;
+    }
 
-   // Getters
-   public int getBookId() { return bookId; }
-   public String getTitle() { return title; }
-   public String getAuthors() { return authors; } // 原 getAuthor() 改為複數
-   public List<String> getIsbns() { return isbns; }
-   public BookStatus getStatus() { return status; }
-   public String getSubjects() { return subjects; }
-   public String getPublisher() { return publisher; }
-   public String getPublishYear() { return publishYear; }
-   public String getEdition() { return edition; }
-   public String getFormatDesc() { return formatDesc; }
-   public String getSource() { return source; }
-   public String getNote() { return note; }
-   }
+    public void setIsbns(List<String> isbns) {
+        this.isbns = isbns;
+    }
+
+    // 實用方法：方便一筆一筆加入自 book_isbns 表撈出來的資料
+    public void addIsbn(String isbn) {
+        if (this.isbns == null) {
+            this.isbns = new ArrayList<>();
+        }
+        this.isbns.add(isbn);
+    }
+
+    // Getters
+    public int getBookId() { return bookId; }
+    public String getTitle() { return title; }
+    public String getAuthors() { return authors; } // 原 getAuthor() 改為複數
+    public List<String> getIsbns() { return isbns; }
+    public BookStatus getStatus() { return status; }
+    public String getSubjects() { return subjects; }
+    public String getPublisher() { return publisher; }
+    public String getPublishYear() { return publishYear; }
+    public String getEdition() { return edition; }
+    public String getFormatDesc() { return formatDesc; }
+    public String getSource() { return source; }
+    public String getNote() { return note; }
+}
+
+BorrowRecord
+package library.model;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 public class BorrowRecord {
 private int recordId;
 private User user;
 private Book book;
+private int borrowDays;
 private LocalDateTime borrowDate;
 private LocalDateTime dueDate;
 private LocalDateTime returnDate;                          //null->沒還
 private boolean isOverdue;
 
-    public BorrowRecord(int recordId, User user, Book book) {
+    public BorrowRecord(int recordId, User user, Book book, int borrowDays) {
         this.recordId = recordId;
         this.user = user;
         this.book = book;
         this.borrowDate = LocalDateTime.now();
-        this.dueDate = borrowDate.plusDays(14);         //借期兩週
+        this.dueDate = borrowDate.plusDays(borrowDays);
         this.returnDate = null;
         this.isOverdue = false;
     }
@@ -440,16 +474,33 @@ private boolean isOverdue;
         this.returnDate = LocalDateTime.now();
         checkOverdue();                                     //還書時check逾期
     }
+    public void hydrateHistoricalDates(LocalDateTime borrowDate, LocalDateTime dueDate, LocalDateTime returnDate) {
+        this.borrowDate = borrowDate;
+        this.dueDate = dueDate;
+        this.returnDate = returnDate;
 
-    public boolean checkOverdue() {
-        if (returnDate != null) {
-            this.isOverdue = returnDate.isAfter(dueDate);
-        } else {
-            this.isOverdue = LocalDateTime.now().isAfter(dueDate);
-        }
-        return this.isOverdue;
+        // 歷史時間重設後，立即根據還書狀態與時間，重新計算該筆紀錄目前是否逾期
+        this.checkOverdue();
     }
 
+    /**
+     * 💡 檢查並刷新逾期狀態的邏輯（確保動態跟隨還原的時間）
+     */
+    public void checkOverdue() {
+        if (this.returnDate != null) {
+            // 如果已經還書，就比較「還書時間」有沒有超過「到期日」
+            this.isOverdue = this.returnDate.isAfter(this.dueDate);
+        } else {
+            // 如果還沒還書，就比較「此時此刻」有沒有超過「到期日」
+            this.isOverdue = LocalDateTime.now().isAfter(this.dueDate);
+        }
+    }
+
+    public boolean isUpcomingDue(int alertDays) {
+        if (returnDate != null) return false;
+        long daysLeft = ChronoUnit.DAYS.between(LocalDateTime.now(), this.dueDate);
+        return daysLeft >= 0 && daysLeft <= alertDays;
+    }
     // Getters
     public int getRecordId() { return recordId; }
     public User getUser() { return user; }
@@ -458,7 +509,15 @@ private boolean isOverdue;
     public LocalDateTime getDueDate() { return dueDate; }
     public LocalDateTime getReturnDate() { return returnDate; }
     public boolean isOverdue() { return isOverdue; }
+
+
+    public int getBorrowDays() {return borrowDays;}
 }
+Fine
+package library.model;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 public class Fine {
 private int fineId;
@@ -530,18 +589,20 @@ private boolean isPaid;
     public BorrowRecord getRecord() { return record; }
     public boolean isPaid() { return isPaid; }
 }
+User
+package library.model;
 
 public class User {
 private int userId;
 private String studentNo;    // 學號
 private String name;
 private String password;     // 密碼
-private String roleLevel;    // 權限等級：NORMAL / VIP / ADMIN
-private String status;       // 狀態：ACTIVE / SUSPENDED
+private UserRole roleLevel;    // 權限等級：NORMAL / VIP / ADMIN
+private UserStatus status;       // 狀態：ACTIVE / SUSPENDED
 private String createdAt;    // 帳號建立時間
 
     // ✨ 完整欄位建構子：供新版 UserRepository 使用
-    public User(int userId, String studentNo, String name, String password, String roleLevel, String status, String createdAt) {
+    public User(int userId, String studentNo, String name, String password, UserRole roleLevel, UserStatus status, String createdAt) {
         this.userId = userId;
         this.studentNo = studentNo;
         this.name = name;
@@ -551,20 +612,11 @@ private String createdAt;    // 帳號建立時間
         this.createdAt = createdAt;
     }
 
-    // 💡 保留舊版建構子以防其他地方開天窗，並自動將舊欄位安全地對接到新架構中
-    public User(int userId, String name, String email) {
-        this.userId = userId;
-        this.name = name;
-        this.studentNo = email; // 暫時以傳入的 email 當作代稱
-        this.roleLevel = "NORMAL";
-        this.status = "ACTIVE";
-    }
-
     // 🎯 核心邏輯優化：依據簡報規範之身份，動態回傳借書上限
     public int getBorrowLimit() {
-        if ("VIP".equalsIgnoreCase(roleLevel)) {
+        if ("VIP".equalsIgnoreCase(String.valueOf(roleLevel))) {
             return 5; // 舉例：VIP 可借 5 本
-        } else if ("ADMIN".equalsIgnoreCase(roleLevel)) {
+        } else if ("ADMIN".equalsIgnoreCase(String.valueOf(roleLevel))) {
             return 999; // 管理員不限
         }
         return 3; // NORMAL 預設 3 本
@@ -573,7 +625,7 @@ private String createdAt;    // 帳號建立時間
     // 🎯 核心邏輯優化：不只要看數量有沒有超標，還要看這個使用者有沒有被停權（SUSPENDED）！
     public boolean canBorrow(int currentBorrowCount) {
         // 只有處於 ACTIVE 狀態，且目前借閱量小於該身份上限的人才可以借書
-        return "ACTIVE".equalsIgnoreCase(this.status) && currentBorrowCount < getBorrowLimit();
+        return "ACTIVE".equalsIgnoreCase(String.valueOf(this.status)) && currentBorrowCount < getBorrowLimit();
     }
 
     // Getters & Setters
@@ -581,21 +633,13 @@ private String createdAt;    // 帳號建立時間
     public String getStudentNo() { return studentNo; }
     public String getName() { return name; }
     public String getPassword() { return password; }
-    public String getRoleLevel() { return roleLevel; }
-    public String getStatus() { return status; }
+    public UserRole getRoleLevel() { return roleLevel; }
+    public void setRoleLevel(UserRole roleLevel) { this.roleLevel = roleLevel; }
     public String getCreatedAt() { return createdAt; }
 
-    public void setStatus(String status) { this.status = status; }
-    public void setRoleLevel(String roleLevel) { this.roleLevel = roleLevel; }
-}
-
-package library.model;
-
-public enum UserRole {
-READER,   // 讀者
-VIP,
-ADMIN     // 管理員
-}
+    public UserStatus getStatus() { return status; }
+    public void setStatus(UserStatus status) { this.status = status; }}
+BookStatus
 package library.model;
 
 public enum BookStatus {
@@ -604,8 +648,25 @@ BORROWED,     // 已借出
 RESERVED,     // 預約中
 UNAVAILABLE   // 不可借（下架/維修）
 }
-3. repository
-   package library.repository;
+UserRole
+package library.model;
+
+public enum UserRole {
+NORMAL,   // 讀者
+VIP,
+ADMIN     // 管理員
+}
+UserStatus
+package library.model;
+
+public enum UserStatus {
+ACTIVE,
+SUSPENDED
+}
+
+repository
+BookRepository
+package library.repository;
 
 import library.database.DatabaseManager;
 import library.model.Book;
@@ -809,8 +870,16 @@ public class BookRepository {
         }
         return isbns;
     }
+    public boolean updateStatusInTransaction(Connection conn, int bookId, String status) throws SQLException {
+        String sql = "UPDATE books SET status = ? WHERE book_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, status);
+            pstmt.setInt(2, bookId);
+            return pstmt.executeUpdate() > 0;
+        }
+    }
 }
-
+BorrowRecordRepository
 package library.repository;
 
 import library.database.DatabaseManager;
@@ -820,6 +889,7 @@ import library.model.User;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -828,52 +898,44 @@ public class BorrowRecordRepository {
     private final UserRepository userRepository = new UserRepository();
     private final BookRepository bookRepository = new BookRepository();
 
+    private static final DateTimeFormatter SQLITE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     /**
-     * ✨ 1. 新增借閱紀錄 (由 BorrowService.borrowBook 呼叫)
+     * ✨ 1. 新增借閱紀錄 (由 BorrowService.borrowBook 在 Transaction 中呼叫)
+     * 💡 移除不必要的內部連線建立，改由外部 Service 傳入共用的 conn
      */
-    public boolean save(int userId, int bookId, LocalDateTime borrowDate, LocalDateTime dueDate) {
-        String sql = "INSERT INTO borrow_records (user_id, book_id, borrow_date, due_date, is_overdue) VALUES (?, ?, ?, ?, 0)";
+    public boolean saveInTransaction(Connection conn, int userId, int bookId, LocalDateTime borrowDate, LocalDateTime dueDate, int borrowDays) throws SQLException {
+        String sql = "INSERT INTO borrow_records (user_id, book_id, borrow_date, due_date, borrow_days, is_overdue) VALUES (?, ?, ?, ?, ?, 0)";
 
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, userId);
             pstmt.setInt(2, bookId);
-            pstmt.setString(3, borrowDate.toString());
-            pstmt.setString(4, dueDate.toString());
+            pstmt.setString(3, borrowDate.format(SQLITE_DATE_FORMATTER));
+            pstmt.setString(4, dueDate.format(SQLITE_DATE_FORMATTER));
+            pstmt.setInt(5, borrowDays);
 
             return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            System.err.println("❌ 儲存借閱紀錄失敗");
-            e.printStackTrace();
-            return false;
         }
     }
 
     /**
-     * ✨ 2. 更新歸還時間與逾期狀態 (由 BorrowService.returnBook 呼叫)
+     * ✨ 2. 更新歸還時間與逾期狀態 (由 BorrowService.returnBook 在 Transaction 中呼叫)
+     * 💡 移除不必要的內部連線建立，改由外部 Service 傳入共用的 conn
      */
-    public boolean updateReturnStatus(int recordId, LocalDateTime returnDate, boolean isOverdue) {
+    public boolean updateReturnStatusInTransaction(Connection conn, int recordId, LocalDateTime returnDate, boolean isOverdue) throws SQLException {
         String sql = "UPDATE borrow_records SET return_date = ?, is_overdue = ? WHERE record_id = ?";
 
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-            pstmt.setString(1, returnDate != null ? returnDate.toString() : null);
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, returnDate != null ? returnDate.format(SQLITE_DATE_FORMATTER) : null);
             pstmt.setInt(2, isOverdue ? 1 : 0);
             pstmt.setInt(3, recordId);
 
             return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            System.err.println("❌ 更新歸還紀錄失敗，Record ID: " + recordId);
-            e.printStackTrace();
-            return false;
         }
     }
 
     /**
      * ✨ 3. 找出某本書目前「尚未歸還」的那筆借閱紀錄
-     * 這是還書邏輯的核心，用來找出到底是誰、在什麼時候借了這本即將要還的書。
      */
     public BorrowRecord findActiveRecordByBookId(int bookId) {
         String sql = "SELECT * FROM borrow_records WHERE book_id = ? AND return_date IS NULL";
@@ -896,7 +958,6 @@ public class BorrowRecordRepository {
 
     /**
      * ✨ 4. 統計特定學生目前「正在借閱中（未還）」的書籍數量
-     * 用於串接你的 User.canBorrow(currentBorrowCount) 防禦邏輯！
      */
     public int countActiveBorrowsByUserId(int userId) {
         String sql = "SELECT COUNT(*) FROM borrow_records WHERE user_id = ? AND return_date IS NULL";
@@ -946,31 +1007,47 @@ public class BorrowRecordRepository {
         int recordId = rs.getInt("record_id");
         int userId = rs.getInt("user_id");
         int bookId = rs.getInt("book_id");
+        int borrowDays = rs.getInt("borrow_days");
 
-        // 透過各自的 Repository 抓取完整的物件，實作多表關聯對接
         User user = userRepository.findById(userId);
         Book book = bookRepository.findById(bookId);
 
-        BorrowRecord record = new BorrowRecord(recordId, user, book);
+        BorrowRecord record = new BorrowRecord(recordId, user, book, borrowDays);
 
-        // 解析時間
         String borrowStr = rs.getString("borrow_date");
         String dueStr = rs.getString("due_date");
         String returnStr = rs.getString("return_date");
 
-        // 覆蓋掉建構子預設的時間，還原歷史真實數據
-        if (borrowStr != null) {
-            // 注意：若資料庫存取格式包含空檔，可視情況做 replace(" ", "T") 處理
-            record.getClass().getDeclaredFields(); // 概念性提示
-            // 實務上可透過為 BorrowRecord 額外開一個完整欄位 Setter 來注入時間：
-            // record.setDates(LocalDateTime.parse(borrowStr), LocalDateTime.parse(dueStr), returnStr != null ? LocalDateTime.parse(returnStr) : null);
-        }
+        LocalDateTime borrowDate = parseSqliteDateTime(borrowStr);
+        LocalDateTime dueDate = parseSqliteDateTime(dueStr);
+        LocalDateTime returnDate = parseSqliteDateTime(returnStr);
 
-        record.checkOverdue(); // 順便依據目前的 return_date 或今日時間刷新逾期布林值
+        record.hydrateHistoricalDates(borrowDate, dueDate, returnDate);
+
         return record;
     }
-}
 
+    /**
+     * 🛠️ 輔助方法：安全地將資料庫時間字串轉為 Java LocalDateTime
+     */
+    private LocalDateTime parseSqliteDateTime(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            String cleanStr = dateStr.replace("T", " ");
+            return LocalDateTime.parse(cleanStr, SQLITE_DATE_FORMATTER);
+        } catch (Exception e) {
+            try {
+                return LocalDateTime.parse(dateStr);
+            } catch (Exception ex) {
+                System.err.println("❌ 嚴重錯誤：無法解析時間欄位 [" + dateStr + "]，返回 null。");
+                return null;
+            }
+        }
+    }
+}
+FineRepository
 package library.repository;
 
 import library.database.DatabaseManager;
@@ -1049,35 +1126,31 @@ public class FineRepository {
         return 0;
     }
 }
-
+UserRepository
 package library.repository;
 
 import library.database.DatabaseManager;
-import library.model.User;
+import library.model.*;
+
 import java.sql.*;
 
 public class UserRepository {
 
-    /**
-     * 根據使用者內部遞增 ID 尋找使用者
-     */
     public User findById(int userId) {
         String sql = "SELECT * FROM users WHERE user_id = ?";
-
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, userId);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    // 🎯 呼叫全新 User 建構子，精準對接簡報 Page 18 欄位
                     return new User(
                             rs.getInt("user_id"),
                             rs.getString("student_no"),
                             rs.getString("name"),
                             rs.getString("password"),
-                            rs.getString("role_level"),
-                            rs.getString("status"),
+                            UserRole.valueOf(rs.getString("role_level").toUpperCase().trim()),
+                            UserStatus.valueOf(rs.getString("status").toUpperCase().trim()),
                             rs.getString("created_at")
                     );
                 }
@@ -1089,26 +1162,24 @@ public class UserRepository {
         return null;
     }
 
-    /**
-     * ✨ 實用新增：根據「學號」尋找使用者
-     * 💡 這在實作系統登入功能（Login Verification）時非常關鍵！
-     */
     public User findByStudentNo(String studentNo) {
         String sql = "SELECT * FROM users WHERE student_no = ?";
-
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, studentNo);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
+                    UserRole role = UserRole.valueOf(rs.getString("role_level").toUpperCase().trim());
+                    UserStatus status = UserStatus.valueOf(rs.getString("status").toUpperCase().trim());
+
                     return new User(
                             rs.getInt("user_id"),
                             rs.getString("student_no"),
                             rs.getString("name"),
                             rs.getString("password"),
-                            rs.getString("role_level"),
-                            rs.getString("status"),
+                            role,
+                            status,
                             rs.getString("created_at")
                     );
                 }
@@ -1119,10 +1190,46 @@ public class UserRepository {
         }
         return null;
     }
+
+    public boolean updateUserStatus(int userId, UserStatus newStatus) {
+        String sql = "UPDATE users SET status = ? WHERE user_id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, newStatus.name());
+            pstmt.setInt(2, userId);
+
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("❌ 更新使用者狀態失敗，User ID: " + userId);
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * ✨ 新增功能：變更使用者角色等級（用於管理者設定或升級 VIP/ADMIN）
+     */
+    public boolean updateUserRole(int userId, UserRole newRole) {
+        String sql = "UPDATE users SET role_level = ? WHERE user_id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, newRole.name()); // 傳入 "ADMIN", "VIP", 或 "NORMAL"
+            pstmt.setInt(2, userId);
+
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("❌ 更新使用者權限等級失敗，User ID: " + userId);
+            e.printStackTrace();
+            return false;
+        }
+    }
 }
 
-4. service
-   package library.service;
+service
+BookService
+package library.service;
 
 import library.model.Book;
 import library.model.BookStatus;
@@ -1292,188 +1399,165 @@ public class BookService {
         return true;
     }
 }
-
+BorrowService
 package library.service;
 
-import library.model.Book;
-import library.model.BookStatus;
-import library.model.BorrowRecord;
-import library.model.Fine;
-import library.repository.BookRepository;
-// import library.repository.BorrowRecordRepository; // 需實作：用來操作 borrow_records 資料表
-// import library.repository.UserRepository;         // 需實作：用來檢查學生 status 與 role_level
+import library.database.DatabaseManager;
+import library.model.*;
+import library.repository.*;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 public class BorrowService {
 
     private final BookRepository bookRepository;
-    // private final BorrowRecordRepository borrowRepository;
-    // private final UserRepository userRepository;
+    private final BorrowRecordRepository borrowRepository;
+    private final UserRepository userRepository;
 
     public BorrowService() {
         this.bookRepository = new BookRepository();
-        // this.borrowRepository = new BorrowRecordRepository();
-        // this.userRepository = new UserRepository();
+        this.borrowRepository = new BorrowRecordRepository();
+        this.userRepository = new UserRepository();
     }
 
     /**
-     * ✨ 核心功能 1：辦理借書交易（包含全方位規則驗證）
-     * * @param userId   借閱學生的用戶 ID (DB 的 user_id)
-     * @param bookId   要借閱的書籍 ID
-     * @param numDays  學生選擇的租借天數 (1, 3, 7, 14 天)
-     * @return 借書結果狀態字串（"SUCCESS" 表示成功；其餘字串為失敗原因，可直接用於 GUI 彈窗提示）
+     * ✨ 核心功能 1：辦理借書交易（實作 Transaction 事務機制，確保資料一致性）
      */
     public String borrowBook(int userId, int bookId, int numDays) {
-
-        // 1️⃣ 驗證書籍狀態：書籍是否存在？是否為可借閱 (AVAILABLE)？
+        // 1️⃣ 驗證書籍狀態
         Book book = bookRepository.findById(bookId);
         if (book == null) {
             return "❌ 系統錯誤：找不到該書籍資料。";
         }
-        if (book.getStatus() != BookStatus.AVAILABLE) {
-            return "⚠️ 借閱失敗：該書籍目前已被他人借出。";
+        if (!"AVAILABLE".equalsIgnoreCase(String.valueOf(book.getStatus()))) {
+            return "⚠️ 借閱失敗：該書籍目前已被他人借出或不可借。";
         }
 
-        // 2️⃣ 驗證使用者狀態（對接 UserRepository）
-        /*
+        // 2️⃣ 驗證使用者狀態與借閱限制規則
         User user = userRepository.findById(userId);
         if (user == null) {
             return "❌ 系統錯誤：找不到該使用者帳號。";
         }
 
-        // 【簡報規格：停權懲罰】如果狀態為 SUSPENDED，拒絕借書
-        if ("SUSPENDED".equalsIgnoreCase(user.getStatus())) {
+        if (user.getStatus() == UserStatus.SUSPENDED) {
             return "❌ 權限受限：您的帳號目前處於「停權」狀態，請先繳清罰款或洽管理員。";
         }
 
-        // 【簡報規格：等級差異】普通會員限制
-        if ("NORMAL".equalsIgnoreCase(user.getRoleLevel()) && numDays > 7) {
-            return "⚠️ 權限不足：普通會員單次借閱上限為 7 天，14 天天數僅限 VIP 借閱。";
+        if (user.getRoleLevel() == UserRole.NORMAL && numDays > 7) {
+            return "⚠️ 權限不足：普通會員單次借閱上限為 7 天，14 天天數僅限 VIP 會員借閱。";
         }
 
-        // 【進階功能：借閱上限】例如限制每人最多同時借 5 本
         int currentBorrowedCount = borrowRepository.countActiveBorrowsByUserId(userId);
-        if (currentBorrowedCount >= 5) {
-            return "⚠️ 借閱失敗：您已達到最高借閱上限（5本），請先還書後再借。";
+        if (!user.canBorrow(currentBorrowedCount)) {
+            return "⚠️ 借閱失敗：已達到您該身分的最高借閱上限，請先還書後再借。";
         }
-        */
 
-        // 3️⃣ 驗證全數通過，執行交易更新
+        // 3️⃣ 驗證全數通過，執行強原子性交易更新
+        Connection conn = null;
         try {
-            // A. 將書籍狀態在 DB 中改為 BORROWED
-            bookRepository.updateStatus(bookId, BookStatus.BORROWED);
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false);
 
-            // B. 計算時間並新增一筆借閱歷史紀錄
+            bookRepository.updateStatusInTransaction(conn, bookId, "BORROWED");
+
             LocalDateTime borrowDate = LocalDateTime.now();
             LocalDateTime dueDate = borrowDate.plusDays(numDays);
 
-            // 呼叫 borrowRepository 寫入一筆新的紀錄到資料庫
-            // borrowRepository.save(userId, bookId, borrowDate, dueDate, numDays);
+            boolean saveRecordSuccess = borrowRepository.saveInTransaction(conn, userId, bookId, borrowDate, dueDate, numDays);
+            if (!saveRecordSuccess) {
+                throw new SQLException("寫入借閱紀錄時失敗");
+            }
 
+            conn.commit();
             return "SUCCESS";
+
         } catch (Exception e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                    System.err.println("⚠️ 借書事務出錯，已安全回滾 (Rollback)。");
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return "❌ 資料庫操作失敗，借書交易未完成。";
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
     }
 
     /**
-     * ✨ 核心功能 2：辦理還書交易（自動整合你的 Fine 罰款模型）
-     * * @param bookId   要歸還的書籍 ID
-     * @return 還書結果字串。若逾期會包含罰金提示（如 "SUCCESS_WITH_FINE:30"）
+     * ✨ 核心功能 2：辦理還書交易（自動整合 Fine 罰款模型）
      */
     public String returnBook(int bookId) {
+        Connection conn = null;
         try {
-            // 1️⃣ 找出這本書「目前尚未歸還」的那筆借閱紀錄
-            // BorrowRecord activeRecord = borrowRepository.findActiveRecordByBookId(bookId);
-            // if (activeRecord == null) {
-            //     return "❌ 系統錯誤：此書籍在紀錄中並未被借出。";
-            // }
+            BorrowRecord activeRecord = borrowRepository.findActiveRecordByBookId(bookId);
+            if (activeRecord == null) {
+                return "❌ 系統錯誤：此書籍在紀錄中並未被借出。";
+            }
 
-            // 2️⃣ 更新書籍狀態為 AVAILABLE
-            bookRepository.updateStatus(bookId, BookStatus.AVAILABLE);
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false);
 
-            // 3️⃣ 更新借閱紀錄的歸還時間 (return_date 改為目前時間)
+            bookRepository.updateStatusInTransaction(conn, bookId, "AVAILABLE");
+
             LocalDateTime returnDate = LocalDateTime.now();
-            // borrowRepository.updateReturnDate(activeRecord.getRecordId(), returnDate);
+            boolean isOverdue = returnDate.isAfter(activeRecord.getDueDate());
 
-            // 4️⃣ 💡 動態整合你的 Fine 模型檢查逾期
-            // activeRecord.setReturnDate(returnDate); // 讓 record 知道歸還時間以便 Fine 計算
-            // if (activeRecord.isOverdue()) {
-            //     Fine fine = new Fine(0, activeRecord);
-            //     int fineAmount = fine.getAmount();
-            //
-            //     // 可在此將罰款紀錄同步寫入資料庫的 fines 表
-            //     // fineRepository.save(fine);
-            //
-            //     return "SUCCESS_WITH_FINE:" + fineAmount;
-            // }
+            borrowRepository.updateReturnStatusInTransaction(conn, activeRecord.getRecordId(), returnDate, isOverdue);
 
+            if (isOverdue) {
+                activeRecord.hydrateHistoricalDates(activeRecord.getBorrowDate(), activeRecord.getDueDate(), returnDate);
+
+                long overdueDays = ChronoUnit.DAYS.between(activeRecord.getDueDate(), returnDate);
+                if (overdueDays == 0) overdueDays = 1;
+
+                int fineAmount = (int) (overdueDays * 50);
+
+                // 💡 修正：直接在事務中連帶將罰金寫入資料庫，不再留白註解
+                String insertFineSql = "INSERT INTO fines (record_id, amount, status, created_at) VALUES (?, ?, 'UNPAID', ?)";
+                try (java.sql.PreparedStatement pstmtFine = conn.prepareStatement(insertFineSql)) {
+                    pstmtFine.setInt(1, activeRecord.getRecordId());
+                    pstmtFine.setInt(2, fineAmount);
+                    pstmtFine.setString(3, returnDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    pstmtFine.executeUpdate();
+                }
+
+                conn.commit();
+                return "SUCCESS_WITH_FINE:" + fineAmount;
+            }
+
+            conn.commit();
             return "SUCCESS";
         } catch (Exception e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
             e.printStackTrace();
             return "❌ 還書失敗，資料庫連線異常。";
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
     }
 
     /**
-     * ✨ 核心功能 3：查詢特定學生的目前借閱與歷史總紀錄（學生端畫面使用）
+     * ✨ 核心功能 3：查詢特定學生的目前借閱與歷史總紀錄（學生端畫面表格數據源）
      */
     public List<BorrowRecord> getUserBorrowHistory(int userId) {
-        // return borrowRepository.findAllByUserId(userId);
-        return new ArrayList<>(); // 暫代 stub
-    }
-
-    /**
-     * ✨ 核心功能 4：管理者全域審查（管理員後台：依學號或全部查詢流水帳）
-     */
-    public List<BorrowRecord> getAllBorrowRecords(String studentNoFilter) {
-        /*
-        if (studentNoFilter == null || studentNoFilter.trim().isEmpty()) {
-            return borrowRepository.findAll();
-        } else {
-            return borrowRepository.findAllByStudentNo(studentNoFilter.trim());
-        }
-        */
-        return new ArrayList<>(); // 暫代 stub
-    }
-
-    /**
-     * ✨ 進階加分功能 5：獲取特定學生的未繳罰款總額與清單
-     */
-    public int getTotalUnpaidFines(int userId) {
-        int total = 0;
-        // 1. 從資料庫撈出該用戶所有「未還且已逾期」或「已還但尚未繳罰款」的紀錄
-        // List<Fine> unpaidFines = fineRepository.findUnpaidByUserId(userId);
-        // for (Fine f : unpaidFines) {
-        //     total += f.getAmount(); // 呼叫你的 fine.getAmount() 自動動態累加最新金額
-        // }
-        return total;
-    }
-
-    /**
-     * ✨ 進階加分功能 6：繳清罰款
-     */
-    public boolean payFine(int fineId) {
-        try {
-            // 1. 撈出該筆罰款，執行支付
-            // Fine fine = fineRepository.findById(fineId);
-            // if (fine != null) {
-            //     fine.pay(); // 鎖定最終金額並標記 isPaid = true
-            //     fineRepository.update(fine); // 更新資料庫
-            //     return true;
-            // }
-            return false;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
+        return borrowRepository.findAllByUserId(userId);
     }
 }
-
+FineService
 package library.service;
 
 import library.model.BorrowRecord;
@@ -1562,7 +1646,7 @@ public class FineService {
             // fineRepository.update(fine);
 
             // 4. 💡 自動復權稽核（關鍵加分業務）：檢查該學生是否「所有罰單都繳清了」？
-            int userId = fine.getRecord().getUserId();
+            int userId = fine.getRecord().getRecordId();
             // int remainingUnpaid = fineRepository.countUnpaidByUserId(userId);
             int remainingUnpaid = 0; // 模擬全部繳清的情境
 
@@ -1618,7 +1702,7 @@ public class FineService {
         return new ArrayList<>();
     }
 }
-
+ReportService
 package library.service;
 
 import library.database.DatabaseManager;
@@ -1763,7 +1847,7 @@ public class ReportService {
         return kpis;
     }
 }
-
+UserService
 package library.service;
 
 import library.database.DatabaseManager;

@@ -86,8 +86,10 @@ public class FineService {
             // fineRepository.update(fine);
 
             // 4. 💡 自動復權稽核（關鍵加分業務）：檢查該學生是否「所有罰單都繳清了」？
-            int userId = fine.getRecord().getUserId();
-            // int remainingUnpaid = fineRepository.countUnpaidByUserId(userId);
+            int userId =
+                    fine.getRecord()
+                            .getUser()
+                            .getUserId();            // int remainingUnpaid = fineRepository.countUnpaidByUserId(userId);
             int remainingUnpaid = 0; // 模擬全部繳清的情境
 
             if (remainingUnpaid == 0) {

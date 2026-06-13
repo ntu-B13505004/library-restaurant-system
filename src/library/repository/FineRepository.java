@@ -9,7 +9,36 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FineRepository {
+    private final BorrowRecordRepository
+            borrowRecordRepository =
+            new BorrowRecordRepository();
 
+    private Fine mapResultSetToFine(ResultSet rs)
+            throws SQLException {
+
+        int fineId =
+                rs.getInt("fine_id");
+
+        int recordId =
+                rs.getInt("record_id");
+
+        int amount =
+                rs.getInt("amount");
+
+        boolean isPaid =
+                rs.getInt("is_paid") == 1;
+
+        BorrowRecord record =
+                borrowRecordRepository
+                        .findById(recordId);
+
+        return new Fine(
+                fineId,
+                record,
+                amount,
+                isPaid
+        );
+    }
     // 需要用這個來重組 BorrowRecord 物件
     // private final BorrowRecordRepository recordRepository = new BorrowRecordRepository();
 
