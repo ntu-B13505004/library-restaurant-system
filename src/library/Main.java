@@ -1,13 +1,13 @@
 package library;
 
-import library.database.DatabaseManager;
-import library.database.DataLoader;
-import library.model.Book;
-import library.model.User;
-import library.repository.BookRepository;
-import library.repository.UserRepository;
+import library.database.*;
+
+import library.model.*;
+import library.repository.*;
+
 import java.util.List;
 
+//now version is for test
 public class Main {
     public static void main(String[] args) {
         System.out.println("=== 圖書館系統啟動中 ===");

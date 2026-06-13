@@ -10,7 +10,7 @@ public class User {
     private String createdAt;    // 帳號建立時間
 
     // ✨ 完整欄位建構子：供新版 UserRepository 使用
-    public User(int userId, String studentNo, String name, String password, String roleLevel, String status, String createdAt) {
+    public User(int userId, String studentNo, String name, String password, UserRole roleLevel, String status, String createdAt) {
         this.userId = userId;
         this.studentNo = studentNo;
         this.name = name;
