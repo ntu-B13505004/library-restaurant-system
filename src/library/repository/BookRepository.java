@@ -212,4 +212,111 @@ public class BookRepository {
             return pstmt.executeUpdate() > 0;
         }
     }
+
+    /**
+     * ✨ 管理者功能：安全上架新書（包含寫入一對多的 ISBN 表）
+     */
+    public boolean insert(Book book) {
+        String insertBookSql = "INSERT INTO books (title, authors, subjects, publisher, publish_year, edition, format_desc, source, note, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String insertIsbnSql = "INSERT INTO book_isbns (book_id, isbn) VALUES (?, ?)";
+
+        Connection conn = null;
+        try {
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false); // 開啟交易
+
+            // 1. 寫入書籍主表並取得自動生成的 book_id
+            try (PreparedStatement pstmt = conn.prepareStatement(insertBookSql, Statement.RETURN_GENERATED_KEYS)) {
+                pstmt.setString(1, book.getTitle());
+                pstmt.setString(2, book.getAuthors());
+                pstmt.setString(3, book.getSubjects());
+                pstmt.setString(4, book.getPublisher());
+                pstmt.setString(5, book.getPublishYear());
+                pstmt.setString(6, book.getEdition());
+                pstmt.setString(7, book.getFormatDesc());
+                pstmt.setString(8, book.getSource());
+                pstmt.setString(9, book.getNote());
+                pstmt.setString(10, book.getStatus().name()); // AVAILABLE
+                pstmt.executeUpdate();
+
+                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        book.setBookId(generatedKeys.getInt(1)); // 回填產生的 ID
+                    } else {
+                        throw new SQLException("建立書籍失敗，無法取得 Generated Key。");
+                    }
+                }
+            }
+
+            // 2. 寫入 ISBN 子表
+            if (book.getIsbns() != null && !book.getIsbns().isEmpty()) {
+                try (PreparedStatement pstmtIsbn = conn.prepareStatement(insertIsbnSql)) {
+                    for (String isbn : book.getIsbns()) {
+                        if (isbn != null && !isbn.trim().isEmpty()) {
+                            pstmtIsbn.setInt(1, book.getBookId());
+                            pstmtIsbn.setString(2, isbn.trim());
+                            pstmtIsbn.addBatch();
+                        }
+                    }
+                    pstmtIsbn.executeBatch();
+                }
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
+        }
+    }
+
+    /**
+     * ✨ 管理者功能：安全下架書籍（級聯刪除書籍與關聯的 ISBN）
+     */
+    public boolean delete(int bookId) {
+        String deleteIsbnsSql = "DELETE FROM book_isbns WHERE book_id = ?";
+        String deleteBookSql = "DELETE FROM books WHERE book_id = ?";
+
+        Connection conn = null;
+        try {
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. 先刪除外鍵子表紀錄
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteIsbnsSql)) {
+                pstmt.setInt(1, bookId);
+                pstmt.executeUpdate();
+            }
+
+            // 2. 再刪除書籍主表紀錄
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteBookSql)) {
+                pstmt.setInt(1, bookId);
+                int affected = pstmt.executeUpdate();
+                if (affected == 0) {
+                    conn.rollback();
+                    return false;
+                }
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
+        }
+    }
 }

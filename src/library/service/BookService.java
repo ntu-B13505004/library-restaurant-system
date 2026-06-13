@@ -2,30 +2,20 @@ package library.service;
 
 import library.model.Book;
 import library.model.BookStatus;
-import library.model.BorrowRecord;
 import library.repository.BookRepository;
 
-// 以下為概念性 import，視你實際的 package 命名調整
-// import library.model.User;
-// import library.model.BorrowRecord;
-// import library.repository.BorrowRecordRepository;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 public class BookService {
 
     private final BookRepository bookRepository;
-    // private final BorrowRecordRepository borrowRecordRepository; // 實作借還紀錄時對接
 
     public BookService() {
         this.bookRepository = new BookRepository();
-        // this.borrowRecordRepository = new BorrowRecordRepository();
     }
 
     /**
-     * 1. 查詢所有書籍
+     * 1. 查詢所有書籍清單（用於表格呈現）
      */
     public List<Book> getAllBooks() {
         return bookRepository.findAll();
@@ -40,50 +30,36 @@ public class BookService {
         }
         return bookRepository.search(keyword.trim());
     }
-    /**
-     * 5. ✨ 進階業務亮點：篩選「即將到期（剩餘 3 天內）」的借閱通知
-     * 為 GUI 的「到期提醒彈窗/公告欄」提供專屬數據源 (簡報第 13 頁規格)
-     */
-    public List<Object> getIncomingDueReminders(int userId) {
-        List<Object> reminders = new ArrayList<>();
-        // 1. 從 Repository 撈出該用戶「所有未歸還」的借閱紀錄
-        // List<BorrowRecord> activeRecords = borrowRecordRepository.findActiveByUserId(userId);
-
-        // 2. 跑迴圈比對時間差
-        /*
-        for (BorrowRecord record : activeRecords) {
-            long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), record.getDueDate());
-            if (daysLeft >= 0 && daysLeft <= 3) { // 距離到期日剩餘 3 天內
-                reminders.add(record);
-            }
-        }
-        */
-        return reminders;
-    }
 
     /**
-     * 6. 管理者功能：新增書籍（上架）(簡報第 14 頁規格)
+     * 3. ✨ 管理者功能：新書上架
+     * 驗證必要欄位（書名），通過後透過 Repository 寫入資料庫
      */
     public boolean addBook(Book book) {
-        // 可在此處做輸入欄位欄位檢驗（如書名不可為空、ISBN 格式驗證等）
-        if (book.getTitle() == null || book.getTitle().trim().isEmpty()) {
+        if (book == null || book.getTitle() == null || book.getTitle().trim().isEmpty()) {
+            System.err.println("⚠️ 上架失敗：書籍標題不可為空。");
             return false;
         }
-        // 呼叫 bookRepository.insert(book); (待擴充)
-        return true;
+        return bookRepository.insert(book);
     }
 
     /**
-     * 7. 管理者功能：下架書籍 (簡報第 14 頁規格)
+     * 4. ✨ 管理者功能：書籍下架
+     * 安全檢查：如果書籍目前是「借出狀態 (BORROWED)」，則拒絕刪除，維護資料庫完整性。
      */
     public boolean removeBook(int bookId) {
         Book book = bookRepository.findById(bookId);
-        // 如果書本還在被借出狀態，不允許下架，保護資料一致性
-        if (book == null || book.getStatus() == BookStatus.BORROWED) {
+        if (book == null) {
+            System.err.println("⚠️ 下架失敗：找不到該書籍 ID。");
             return false;
         }
-        // 呼叫 bookRepository.delete(bookId); (待擴充)
-        return true;
-    }
 
+        // 核心業務規則：被借出的書不能直接從系統中抹除
+        if (book.getStatus() == BookStatus.BORROWED) {
+            System.err.println("❌ 下架失敗：該書籍目前正被學生借閱中，無法執行下架。");
+            return false;
+        }
+
+        return bookRepository.delete(bookId);
+    }
 }

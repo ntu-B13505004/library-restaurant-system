@@ -57,6 +57,11 @@ public class Book {
 
     // Getters
     public int getBookId() { return bookId; }
+
+    public void setBookId(int bookId) {
+        this.bookId = bookId;
+    }
+
     public String getTitle() { return title; }
     public String getAuthors() { return authors; } // 原 getAuthor() 改為複數
     public List<String> getIsbns() { return isbns; }
@@ -68,4 +73,6 @@ public class Book {
     public String getFormatDesc() { return formatDesc; }
     public String getSource() { return source; }
     public String getNote() { return note; }
+
+
 }
