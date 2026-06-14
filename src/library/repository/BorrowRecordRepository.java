@@ -153,6 +153,43 @@ public class BorrowRecordRepository {
 
         return records;
     }
+
+    /**
+     * ✨ 6. 查詢全體借閱紀錄（支援學號模糊/精確過濾）
+     * 供 AdminDashboardView 借還紀錄查詢使用
+     */
+    public List<BorrowRecord> findAll(String studentNoFilter) {
+        List<BorrowRecord> records = new ArrayList<>();
+
+        // 利用 JOIN 關聯 users 表，以便透過 student_no 進行篩選
+        StringBuilder sql = new StringBuilder(
+                "SELECT r.* FROM borrow_records r " +
+                        "JOIN users u ON r.user_id = u.user_id "
+        );
+
+        if (studentNoFilter != null && !studentNoFilter.trim().isEmpty()) {
+            sql.append("WHERE u.student_no LIKE ? ");
+        }
+        sql.append("ORDER BY r.borrow_date DESC");
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+
+            if (studentNoFilter != null && !studentNoFilter.trim().isEmpty()) {
+                pstmt.setString(1, "%" + studentNoFilter.trim() + "%");
+            }
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    records.add(mapResultSetToRecord(rs));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ 查詢全體借還紀錄失敗");
+            e.printStackTrace();
+        }
+        return records;
+    }
     /**
      * 🛠️ 輔助方法：將資料庫欄位，拼裝轉換回強型別的物件組合
      */

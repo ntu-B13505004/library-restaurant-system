@@ -14,27 +14,21 @@ public class UserRepository {
     /**
      * ResultSet → User
      */
-    private User mapResultSetToUser(ResultSet rs)
-            throws SQLException {
+    private User mapResultSetToUser(ResultSet rs) throws SQLException {
+        // 增加安全檢查：如果 created_at 為 null，則使用 LocalDateTime.now()
+        Timestamp ts = rs.getTimestamp("created_at");
+        java.time.LocalDateTime createdAt = (ts != null) ? ts.toLocalDateTime() : java.time.LocalDateTime.now();
 
         return new User(
                 rs.getInt("user_id"),
                 rs.getString("student_no"),
                 rs.getString("name"),
                 rs.getString("password"),
-                UserRole.valueOf(
-                        rs.getString("role_level")
-                                .toUpperCase()
-                                .trim()
-                ),
-                UserStatus.valueOf(
-                        rs.getString("status")
-                                .toUpperCase()
-                                .trim()
-                ),
-                rs.getTimestamp("created_at").toLocalDateTime()        );
+                UserRole.valueOf(rs.getString("role_level").toUpperCase().trim()),
+                UserStatus.valueOf(rs.getString("status").toUpperCase().trim()),
+                createdAt // 使用上面處理過的變數
+        );
     }
-
     /**
      * 依 ID 查詢
      */

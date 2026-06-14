@@ -39,3 +39,4 @@ user_id, book_id 在 Borrow_records.json 中存在，另外Borrow_records也有r
 數據建立時間為導入時間的 45 天前,
 
 **你們會需要解析這部分資料並導入資料庫**
+--module-path "C:\Users\user\OneDrive\文件\GitHub\library-restaurant-system\javafx-sdk-26.0.1\lib" --add-modules javafx.controls,javafx.fxml

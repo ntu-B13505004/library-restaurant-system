@@ -175,4 +175,12 @@ public class BorrowService {
     public List<BorrowRecord> getUserBorrowHistory(int userId) {
         return borrowRepository.findAllByUserId(userId);
     }
+
+    /**
+     * ✨ 管理員功能：查詢全體借閱紀錄（支援學號過濾）
+     * 供 AdminDashboardView 呼叫
+     */
+    public List<BorrowRecord> getAllBorrowRecords(String studentNoFilter) {
+        return borrowRepository.findAll(studentNoFilter);
+    }
 }
