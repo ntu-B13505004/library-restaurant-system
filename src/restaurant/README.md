@@ -77,6 +77,7 @@ table.isDineIn();       // true = 內用, false = 外帶
 | `name` | String | 姓名 |
 | `phone` | String | 電話（不可重複） |
 | `birthMonth` | int | 生日月份 1～12 |
+| `birthDate` | int | 生日日期 |
 | `totalSpent` | int | 累積消費金額 |
 | `tier` | MemberTier | 等級，根據 totalSpent 自動升級 |
 
@@ -131,11 +132,11 @@ menuService.printMenu();          // 印出完整菜單
 ```java
 MemberService memberService = new MemberService();
 
-memberService.registerMember("小明", "0912345678", 3);  // 姓名、電話、生日月份
-memberService.findMemberByPhone("0912345678");           // 查詢，找不到回傳 null
-memberService.updateTotalSpent(member, 500);             // 累加消費，自動觸發升級判斷
-memberService.getAllMembers();                            // 取得所有會員
-memberService.printAllMembers();                         // 印出會員列表
+memberService.registerMember("小明", "0912345678", 3, 20);  // 姓名、電話、生日月份、生日日期
+memberService.findMemberByPhone("0912345678");              // 查詢，找不到回傳 null
+memberService.updateTotalSpent(member, 500);                // 累加消費，自動觸發升級判斷
+memberService.getAllMembers();                              // 取得所有會員
+memberService.printAllMembers();                            // 印出會員列表
 ```
 
 ### `OrderService`（訂單管理）
