@@ -1,43 +1,66 @@
-請把 Users.json, Books.json, Borrow_records.json 的數據作為已有數據導入專案
+# library-restaurant-system
 
-Users.json 有 20 筆數據
+- Claude給我的架構但我懶得動了
+- 要開Edit才看的到排版
+  - DatabaseManager   →   負責開門（連線）
+  - BookRepository    →   負責去拿東西（SQL）
+  - BookService       →   負責決定要拿什麼（邏輯）
 
-Books.json 有 200 筆數據
-
-Borrow_records.json 有 30 筆數據
-
-user_id, book_id 在 Borrow_records.json 中存在，另外Borrow_records也有record_id ，但他們分別是Users, Books, Borrow_record作為資料庫的自增主鍵，所以我們提供的數據並不包含這一部分
-
-另外Borrow_records中的數據是根據導入當前時間
-
-以一個Borrow_records.json的數據來說明:
-
-```
-{
-  "user_id": 5,
-  "book_id": 23,
-  "borrow_date": "-45 days",
-  "due_date": "-38 days",
-  "return_date": "-42 days",
-  "borrow_days": 7,
-  "created_at": "-45 days"
-}
-```
-
-這份紀錄代表借閱者的 id = 5, 
-
-借閱的書籍 id = 23, 
-
-借閱的時間為導入時間的 45 天前, 
-
-到期的時間為導入時間的 38 天前,
-
-還書的時間為導入時間的 42 天前,
-
-借閱時長為 7 天,
-
-數據建立時間為導入時間的 45 天前,
-
-**你們會需要解析這部分資料並導入資料庫**
---module-path "C:\Users\user\OneDrive\文件\GitHub\library-restaurant-system\javafx-sdk-26.0.1\lib" --add-modules javafx.controls,javafx.fxml
-System.out.println("🚩 系統成功自動內建管理員帳號：[ ADMIN001 ]，密碼：[ admin123 ]");
+***自動內建管理員帳號：[ ADMIN001 ]，密碼：[ admin123 ]***
+# LibraryApp
+1. Database
+   - [DatabaseManager.java](database/DatabaseManager.java)
+     - initializeDatabase
+   - [DataLoader.java](database/DataLoader.java)
+     - loadInitialData
+     - isDataExists
+     - importUsers
+     - importBooks
+     - importBorrowRecords
+     - convertRelativeTime
+     - joinListOrString
+2. model
+   - [Book.java](model/Book.java)
+   - [BorrowRecord.java](model/BorrowRecord.java)
+   - [Fine.java](model/Fine.java)
+   - [User.java](model/User.java)
+3. repository
+   - [BookRepository.java](repository/BookRepository.java)
+   - [BorrowRecordRepository.java](repository/BorrowRecordRepository.java)
+   - [FineRepository.java](repository/FineRepository.java)
+   - [UserRepository.java](repository/UserRepository.java)
+4. sevice
+   - [BookService.java](service/BookService.java)
+     - getAllBooks ***[Y]***
+     - addBook ***[Y]*** 
+     - removeBook ***[Y]***
+   - [BorrowService.java](service/BorrowService.java)
+     - borrowBook ***[Y]***
+     - returnBook ***[Y]***
+     - getUserBorrowHistory
+     - getAllBorrowRecords
+   - [FineService.java](service/FineService.java)
+     - createOrUpdateFine
+     - payFine
+     - getUnpaidFinesByUser
+     - getTotalUnpaidAmount
+     - getAllUnpaidFines
+   - [ReportService.java](service/ReportService.java)
+     - getBookSubjectPopularity
+     - getTop5BorrowedBooks
+     - getLibraryFineSummary
+     - getLibraryGeneralKPIs
+   - [UserService.java](service/UserService.java)
+     - login ***[Y]***
+     - registerUser ***[Y]***
+     - updateUserStatus ***[Y]***
+     - updateUserRole 
+     - getUserById
+     - getUserByStudentNo
+     - getAllStudents
+5. gui
+   - [AdminDashboardView.java](gui/AdminDashboardView.java)
+   - [AppStyle.java](gui/AppStyle.java)
+   - [LoginView.java](gui/LoginView.java)
+   - [RegisterView.java](gui/RegisterView.java)
+   - [UserDashboardView.java](gui/UserDashboardView.java)
