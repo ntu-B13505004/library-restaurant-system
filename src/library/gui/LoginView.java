@@ -7,20 +7,9 @@ import javafx.scene.layout.*;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import library.service.UserService;
-
 import java.util.Map;
 
-/**
- * 登入畫面
- * 左半邊：品牌介紹區（靛藍底）
- * 右半邊：登入表單卡片
- *
- * 根據角色導向不同主畫面：
- *   ADMIN  → AdminDashboardView
- *   其他   → UserDashboardView
- */
 public class LoginView {
-
     private final Stage stage;
     private final UserService userService = new UserService();
 
@@ -29,166 +18,95 @@ public class LoginView {
     }
 
     public void show() {
-        // ── 左側品牌區 ────────────────────────────────
-        VBox brandPane = buildBrandPane();
+        HBox root = new HBox();
+        root.setStyle("-fx-background-color: " + AppStyle.BG_WINDOW + ";");
 
-        // ── 右側表單區 ────────────────────────────────
-        VBox formPane = buildFormPane();
+        // 左側品牌區
+        VBox brandPane = new VBox(20);
+        brandPane.setAlignment(Pos.CENTER_LEFT);
+        brandPane.setPadding(new Insets(50));
+        brandPane.setPrefWidth(380);
+        brandPane.setStyle("-fx-background-color: " + AppStyle.PRIMARY + ";");
 
-        // ── 組合 ──────────────────────────────────────
-        HBox root = new HBox(brandPane, formPane);
-        HBox.setHgrow(brandPane, Priority.NEVER);
+        Label title = new Label("智慧圖書館\n核心系統");
+        title.setFont(Font.font("System", FontWeight.BOLD, 32));
+        title.setStyle("-fx-text-fill: white; -fx-line-spacing: 10;");
+        Label desc = new Label("University Library Management System\n提供更快速、流暢的數位借閱體驗。");
+        desc.setStyle("-fx-text-fill: #BBBCDE; -fx-font-size: 14px;");
+        brandPane.getChildren().addAll(title, desc);
+
+        // 右側登入表單區
+        VBox formPane = new VBox();
+        formPane.setAlignment(Pos.CENTER);
+        formPane.setPadding(new Insets(40));
         HBox.setHgrow(formPane, Priority.ALWAYS);
 
-        Scene scene = new Scene(root, 880, 580);
-        stage.setTitle("圖書館借還書系統");
-        stage.setScene(scene);
-        stage.setResizable(false);
-        stage.show();
-    }
-
-    // ── 左側品牌區 ────────────────────────────────────
-    private VBox buildBrandPane() {
-        VBox pane = new VBox(18);
-        pane.setPrefWidth(340);
-        pane.setAlignment(Pos.CENTER_LEFT);
-        pane.setPadding(new Insets(60, 50, 60, 50));
-        pane.setStyle(
-                "-fx-background-color: linear-gradient(to bottom, " + AppStyle.PRIMARY + ", " + AppStyle.BG_SIDEBAR + ");"
-        );
-
-        Label icon = new Label("📚");
-        icon.setStyle("-fx-font-size: 52px;");
-
-        Label title = new Label("圖書館\n借還書系統");
-        title.setStyle(
-                "-fx-font-size: 28px;"
-                        + "-fx-font-weight: bold;"
-                        + "-fx-text-fill: white;"
-                        + "-fx-line-spacing: 6;"
-        );
-        title.setWrapText(true);
-
-        Label sub = new Label("Library Management System");
-        sub.setStyle(
-                "-fx-font-size: 13px;"
-                        + "-fx-text-fill: rgba(255,255,255,0.65);"
-        );
-
-        Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: rgba(255,255,255,0.2);");
-        VBox.setMargin(sep, new Insets(12, 0, 12, 0));
-
-        // 功能提示列表
-        String[] features = {
-                "🔍  多條件書籍搜尋",
-                "📖  快速借閱與歸還",
-                "⏰  逾期提醒機制",
-                "🛡  管理員後台管理"
-        };
-        VBox featureList = new VBox(10);
-        for (String f : features) {
-            Label lbl = new Label(f);
-            lbl.setStyle("-fx-font-size: 13px; -fx-text-fill: rgba(255,255,255,0.82);");
-            featureList.getChildren().add(lbl);
-        }
-
-        pane.getChildren().addAll(icon, title, sub, sep, featureList);
-        return pane;
-    }
-
-    // ── 右側登入表單 ──────────────────────────────────
-    private VBox buildFormPane() {
-        VBox outer = new VBox();
-        outer.setAlignment(Pos.CENTER);
-        outer.setStyle(AppStyle.pageBackground());
-        outer.setPadding(new Insets(40));
-
-        VBox card = new VBox(20);
+        VBox card = new VBox(18);
         card.setStyle(AppStyle.card());
-        card.setPadding(new Insets(40, 48, 40, 48));
-        card.setMaxWidth(380);
+        card.setPadding(new Insets(40, 45, 40, 45));
+        card.setMaxWidth(400);
 
-        // 標題
         Label heading = new Label("歡迎回來");
-        heading.setStyle(AppStyle.labelTitle());
-        Label hint = new Label("請輸入您的學號與密碼登入");
-        hint.setStyle(AppStyle.labelSubtitle());
+        heading.setFont(Font.font("System", FontWeight.BOLD, 22));
+        heading.setStyle("-fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
 
-        // 學號
-        Label studentNoLabel = new Label("學號");
-        studentNoLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
-        TextField studentNoField = new TextField();
-        studentNoField.setPromptText("例：B11234567");
-        studentNoField.setStyle(AppStyle.textField());
-        studentNoField.setMaxWidth(Double.MAX_VALUE);
+        TextField usernameField = new TextField();
+        usernameField.setPromptText("請輸入學號/帳號");
+        usernameField.setStyle(AppStyle.textField());
 
-        // 密碼
-        Label passwordLabel = new Label("密碼");
-        passwordLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
         PasswordField passwordField = new PasswordField();
         passwordField.setPromptText("請輸入密碼");
         passwordField.setStyle(AppStyle.textField());
-        passwordField.setMaxWidth(Double.MAX_VALUE);
 
-        // 錯誤訊息
-        Label errorLabel = new Label("");
-        errorLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: " + AppStyle.DANGER + ";");
-        errorLabel.setWrapText(true);
+        Label errorLabel = new Label();
+        errorLabel.setStyle("-fx-text-fill: " + AppStyle.DANGER + "; -fx-font-size: 13px;");
 
-        // 登入按鈕
-        Button loginBtn = new Button("登入");
-        loginBtn.setStyle(AppStyle.btnPrimary());
+        Button loginBtn = new Button("立即登入");
+        loginBtn.setStyle(AppStyle.buttonPrimary());
         loginBtn.setMaxWidth(Double.MAX_VALUE);
+        loginBtn.setPrefHeight(40);
 
-        // 前往註冊
-        HBox registerRow = new HBox(6);
-        registerRow.setAlignment(Pos.CENTER);
-        Label noAccount = new Label("還沒有帳號？");
-        noAccount.setStyle(AppStyle.labelSubtitle());
-        Hyperlink registerLink = new Hyperlink("立即註冊");
-        registerLink.setStyle("-fx-font-size: 13px; -fx-text-fill: " + AppStyle.PRIMARY + ";");
-        registerRow.getChildren().addAll(noAccount, registerLink);
+        HBox registerBox = new HBox(5);
+        registerBox.setAlignment(Pos.CENTER);
+        Label noAccount = new Label("還沒有帳號嗎？");
+        noAccount.setStyle("-fx-text-fill: " + AppStyle.TEXT_SECONDARY + ";");
+        Hyperlink registerLink = new Hyperlink("註冊新帳號");
+        registerLink.setStyle("-fx-text-fill: " + AppStyle.ACCENT + "; -fx-underline: false;");
+        registerBox.getChildren().addAll(noAccount, registerLink);
 
-        // 事件：登入
-        Runnable doLogin = () -> {
-            String sno = studentNoField.getText().trim();
+        // 登入事件處理
+        Runnable handleLogin = () -> {
+            String sno = usernameField.getText().trim();
             String pwd = passwordField.getText();
             if (sno.isEmpty() || pwd.isEmpty()) {
-                errorLabel.setText("學號與密碼不得空白。");
+                errorLabel.setText("⚠️ 帳號與密碼不得為空！");
                 return;
             }
             Map<String, Object> session = userService.login(sno, pwd);
             if (session == null) {
-                errorLabel.setText("學號或密碼錯誤，請再試一次。");
-                passwordField.clear();
-                return;
-            }
-            String role = (String) session.get("roleLevel");
-            if ("ADMIN".equalsIgnoreCase(role)) {
-                new AdminDashboardView(stage, session).show();
+                errorLabel.setText("❌ 學號或密碼錯誤，請再試一次。");
             } else {
-                new UserDashboardView(stage, session).show();
+                String role = (String) session.get("roleLevel");
+                if ("ADMIN".equalsIgnoreCase(role)) {
+                    new AdminDashboardView(stage, session).show();
+                } else {
+                    new UserDashboardView(stage, session).show();
+                }
             }
         };
 
-        loginBtn.setOnAction(e -> doLogin.run());
-        passwordField.setOnAction(e -> doLogin.run());
-
-        // 事件：前往註冊
+        loginBtn.setOnAction(e -> handleLogin.run());
+        passwordField.setOnAction(e -> handleLogin.run());
         registerLink.setOnAction(e -> new RegisterView(stage).show());
 
-        card.getChildren().addAll(
-                heading, hint,
-                studentNoLabel, studentNoField,
-                passwordLabel, passwordField,
-                errorLabel,
-                loginBtn,
-                registerRow
-        );
+        card.getChildren().addAll(heading, new Separator(), usernameField, passwordField, errorLabel, loginBtn, registerBox);
+        formPane.getChildren().add(card);
+        root.getChildren().addAll(brandPane, formPane);
 
-        outer.getChildren().add(card);
-        VBox.setVgrow(card, Priority.NEVER);
-        return outer;
+        Scene scene = new Scene(root, 900, 580);
+        stage.setScene(scene);
+        stage.setTitle("圖書館管理系統 - 登入");
+        stage.centerOnScreen();
+        stage.show();
     }
 }

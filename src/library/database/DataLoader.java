@@ -51,9 +51,10 @@ public class DataLoader {
     }
 
     private static boolean isDataExists() {
+        // 💡 修正：改為檢查書籍表，避免被內建管理員帳號誤導
         try (Connection conn = DatabaseManager.getConnection();
              Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM books")) {
             return rs.next() && rs.getInt(1) > 0;
         } catch (SQLException e) {
             return false;
@@ -120,7 +121,16 @@ public class DataLoader {
                     String authors = joinListOrString(b.get("作者"));
                     String subjects = joinListOrString(b.get("主題"));
                     String publisher = (String) b.get("出版者");
-                    String publishYear = (String) b.get("出版日期");
+                    ///String publishYear = (String) b.get("出版日期");
+                    Object yearObj = b.get("出版年"); // 配合 JSON 欄位名 "出版年"
+
+                    String publishYear = null;
+                    if (yearObj instanceof Number) {
+                        publishYear = String.valueOf(((Number) yearObj).intValue()); // 安全轉為 "2025" 字串
+                    } else if (yearObj != null) {
+                        publishYear = yearObj.toString().trim();
+                    }
+
                     String edition = (String) b.get("版本");
                     String formatDesc = (String) b.get("格式");
                     String source = (String) b.get("資料來源");

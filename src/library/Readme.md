@@ -40,3 +40,4 @@ user_id, book_id 在 Borrow_records.json 中存在，另外Borrow_records也有r
 
 **你們會需要解析這部分資料並導入資料庫**
 --module-path "C:\Users\user\OneDrive\文件\GitHub\library-restaurant-system\javafx-sdk-26.0.1\lib" --add-modules javafx.controls,javafx.fxml
+System.out.println("🚩 系統成功自動內建管理員帳號：[ ADMIN001 ]，密碼：[ admin123 ]");

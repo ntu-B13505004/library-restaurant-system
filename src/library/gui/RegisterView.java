@@ -4,15 +4,11 @@ import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.text.*;
 import javafx.stage.Stage;
 import library.service.UserService;
 
-/**
- * 使用者註冊畫面
- * 欄位：學號、姓名、密碼、確認密碼、會員等級（NORMAL / VIP）
- */
 public class RegisterView {
-
     private final Stage stage;
     private final UserService userService = new UserService();
 
@@ -21,135 +17,92 @@ public class RegisterView {
     }
 
     public void show() {
-        VBox outer = new VBox();
-        outer.setAlignment(Pos.CENTER);
-        outer.setStyle(AppStyle.pageBackground());
-        outer.setPadding(new Insets(40));
+        VBox root = new VBox();
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(30));
+        root.setStyle("-fx-background-color: " + AppStyle.BG_WINDOW + ";");
 
-        VBox card = new VBox(16);
+        VBox card = new VBox(15);
         card.setStyle(AppStyle.card());
-        card.setPadding(new Insets(40, 48, 40, 48));
+        card.setPadding(new Insets(35, 45, 35, 45));
         card.setMaxWidth(420);
 
-        // 標題
-        Label heading = new Label("建立新帳號");
-        heading.setStyle(AppStyle.labelTitle());
-        Label subheading = new Label("填寫以下資料完成註冊");
-        subheading.setStyle(AppStyle.labelSubtitle());
+        Label title = new Label("建立新帳號");
+        title.setFont(Font.font("System", FontWeight.BOLD, 22));
+        title.setStyle("-fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
 
-        // ── 欄位 ──────────────────────────────────────
-        TextField studentNoField = styledField("學號", "例：B11234567");
-        TextField nameField      = styledField("姓名", "請輸入真實姓名");
-        PasswordField pwdField   = styledPassword("密碼", "至少6碼");
-        PasswordField confirmPwd = styledPassword("確認密碼", "再輸入一次密碼");
+        TextField snoField = new TextField();
+        snoField.setPromptText("學號 (例如: B13505019)");
+        snoField.setStyle(AppStyle.textField());
 
-        Label roleLabel = new Label("會員等級");
-        roleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
+        TextField nameField = new TextField();
+        nameField.setPromptText("真實姓名");
+        nameField.setStyle(AppStyle.textField());
 
-        ToggleGroup roleGroup = new ToggleGroup();
-        RadioButton normalRadio = new RadioButton("普通會員（最多借3本，7天）");
-        normalRadio.setToggleGroup(roleGroup);
-        normalRadio.setSelected(true);
-        normalRadio.setStyle("-fx-font-size: 13px; -fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
+        PasswordField pwdField = new PasswordField();
+        pwdField.setPromptText("設定密碼");
+        pwdField.setStyle(AppStyle.textField());
 
-        RadioButton vipRadio = new RadioButton("VIP 會員（最多借5本，14天）");
-        vipRadio.setToggleGroup(roleGroup);
-        vipRadio.setStyle("-fx-font-size: 13px; -fx-text-fill: " + AppStyle.PRIMARY + "; -fx-font-weight: bold;");
+        PasswordField confirmPwdField = new PasswordField();
+        confirmPwdField.setPromptText("再次輸入確認密碼");
+        confirmPwdField.setStyle(AppStyle.textField());
 
-        HBox roleBox = new HBox(20, normalRadio, vipRadio);
-        roleBox.setAlignment(Pos.CENTER_LEFT);
+        ComboBox<String> roleCombo = new ComboBox<>();
+        roleCombo.getItems().addAll("NORMAL", "VIP");
+        roleCombo.setValue("NORMAL");
+        roleCombo.setMaxWidth(Double.MAX_VALUE);
+        roleCombo.setStyle(AppStyle.textField());
 
-        // 錯誤 / 成功訊息
-        Label msgLabel = new Label("");
-        msgLabel.setStyle("-fx-font-size: 13px;");
+        Label msgLabel = new Label();
         msgLabel.setWrapText(true);
 
-        // 按鈕列
-        Button registerBtn = new Button("確認註冊");
-        registerBtn.setStyle(AppStyle.btnPrimary());
-        registerBtn.setMaxWidth(Double.MAX_VALUE);
+        Button regBtn = new Button("完成註冊");
+        regBtn.setStyle(AppStyle.buttonPrimary());
+        regBtn.setMaxWidth(Double.MAX_VALUE);
+        regBtn.setPrefHeight(38);
 
         Button backBtn = new Button("返回登入");
-        backBtn.setStyle(AppStyle.btnOutline());
+        backBtn.setStyle(AppStyle.buttonSecondary());
         backBtn.setMaxWidth(Double.MAX_VALUE);
+        backBtn.setPrefHeight(38);
 
-        // 事件：註冊
-        registerBtn.setOnAction(e -> {
-            String sno  = studentNoField.getText().trim();
+        regBtn.setOnAction(e -> {
+            String sno = snoField.getText().trim();
             String name = nameField.getText().trim();
-            String pwd  = pwdField.getText();
-            String cpwd = confirmPwd.getText();
-            String role = vipRadio.isSelected() ? "VIP" : "NORMAL";
+            String pwd = pwdField.getText();
+            String cpwd = confirmPwdField.getText();
+            String role = roleCombo.getValue();
 
             if (!pwd.equals(cpwd)) {
-                setMsg(msgLabel, "兩次密碼輸入不一致。", false);
-                return;
-            }
-            if (pwd.length() < 6) {
-                setMsg(msgLabel, "密碼至少需6碼。", false);
+                msgLabel.setText("❌ 兩次密碼輸入不一致！");
+                msgLabel.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
                 return;
             }
 
-            String result = userService.registerUser(sno, name, pwd, role);
-            if ("SUCCESS".equals(result)) {
-                setMsg(msgLabel, "✅ 註冊成功！即將返回登入頁...", true);
-                registerBtn.setDisable(true);
-                // 延遲 1.5 秒跳回登入
-                new Thread(() -> {
-                    try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
-                    javafx.application.Platform.runLater(() -> new LoginView(stage).show());
-                }).start();
+            String res = userService.registerUser(sno, name, pwd, role);
+            if ("SUCCESS".equals(res)) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "🎉 註冊成功！將為您返回登入頁面。", ButtonType.OK);
+                alert.showAndWait();
+                new LoginView(stage).show();
             } else {
-                setMsg(msgLabel, result, false);
+                msgLabel.setText(res);
+                msgLabel.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
             }
         });
 
         backBtn.setOnAction(e -> new LoginView(stage).show());
 
-        card.getChildren().addAll(
-                heading, subheading,
-                labeledNode("學號", studentNoField),
-                labeledNode("姓名", nameField),
-                labeledNode("密碼", pwdField),
-                labeledNode("確認密碼", confirmPwd),
-                roleLabel, roleBox,
-                msgLabel,
-                registerBtn, backBtn
-        );
+        card.getChildren().addAll(title, new Separator(),
+                new Label("學號"), snoField,
+                new Label("姓名"), nameField,
+                new Label("密碼"), pwdField,
+                new Label("確認密碼"), confirmPwdField,
+                new Label("身分級別"), roleCombo,
+                msgLabel, regBtn, backBtn);
 
-        outer.getChildren().add(card);
-
-        Scene scene = new Scene(outer, 880, 640);
+        root.getChildren().add(card);
+        Scene scene = new Scene(root, 900, 650);
         stage.setScene(scene);
-    }
-
-    // ── 輔助方法 ──────────────────────────────────────
-
-    private TextField styledField(String label, String prompt) {
-        TextField f = new TextField();
-        f.setPromptText(prompt);
-        f.setStyle(AppStyle.textField());
-        f.setMaxWidth(Double.MAX_VALUE);
-        return f;
-    }
-
-    private PasswordField styledPassword(String label, String prompt) {
-        PasswordField f = new PasswordField();
-        f.setPromptText(prompt);
-        f.setStyle(AppStyle.textField());
-        f.setMaxWidth(Double.MAX_VALUE);
-        return f;
-    }
-
-    private VBox labeledNode(String labelText, javafx.scene.Node field) {
-        Label lbl = new Label(labelText);
-        lbl.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " + AppStyle.TEXT_PRIMARY + ";");
-        VBox box = new VBox(5, lbl, field);
-        return box;
-    }
-
-    private void setMsg(Label lbl, String text, boolean success) {
-        lbl.setText(text);
-        lbl.setStyle("-fx-font-size: 13px; -fx-text-fill: " + (success ? AppStyle.SUCCESS : AppStyle.DANGER) + ";");
+        stage.centerOnScreen();
     }
 }
