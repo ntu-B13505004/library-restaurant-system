@@ -87,8 +87,9 @@ public class DataLoader {
                     pstmt.setString(1, studentNo);
                     pstmt.setString(2, name);
                     pstmt.setString(3, password);
-                    pstmt.setString(4, roleLevel != null ? roleLevel : "NORMAL");
-                    pstmt.setString(5, status != null ? status : "ACTIVE");
+                    // 💡 優化：寫入前強制轉大寫，確保符合 Enum 規格
+                    pstmt.setString(4, roleLevel != null ? roleLevel.toUpperCase().trim() : "NORMAL");
+                    pstmt.setString(5, status != null ? status.toUpperCase().trim() : "ACTIVE");
                     pstmt.setString(6, createdAt != null ? createdAt : LocalDateTime.now().format(formatter));
 
                     pstmt.addBatch();
@@ -97,7 +98,6 @@ public class DataLoader {
             }
         }
     }
-
     private static void importBooks(Connection conn) throws Exception {
         Gson gson = new Gson();
         try (FileReader reader = new FileReader("Books.json")) {

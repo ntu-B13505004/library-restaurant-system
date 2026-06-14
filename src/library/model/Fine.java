@@ -6,18 +6,18 @@ import java.time.temporal.ChronoUnit;
 public class Fine {
     private int fineId;
     private BorrowRecord record; // 關聯的借閱紀錄
-    private int amount;          // 若已結清，記錄當時繳納的金額；若未結清，則作為快照緩存
+    private int paidAmount;          // 若已結清，記錄當時繳納的金額；若未結清，則作為快照緩存
     private boolean isPaid;
 
-    private static final int DAILY_FINE = 10; // 每天 10 元
+    public static final int DAILY_FINE = 10;
 
     /**
      * 從資料庫撈出已存在罰款紀錄時使用的建構子
      */
-    public Fine(int fineId, BorrowRecord record, int amount, boolean isPaid) {
+    public Fine(int fineId, BorrowRecord record, int paidAmount, boolean isPaid) {
         this.fineId = fineId;
         this.record = record;
-        this.amount = amount;
+        this.paidAmount = paidAmount;
         this.isPaid = isPaid;
     }
 
@@ -28,7 +28,7 @@ public class Fine {
         this.fineId = fineId;
         this.record = record;
         this.isPaid = false;
-        this.amount = calculateCurrentAmount();
+        this.paidAmount = 0;
     }
 
     /**
@@ -53,21 +53,19 @@ public class Fine {
      */
     public int getAmount() {
         if (!isPaid) {
-            // 還沒付錢前，金額隨時間動態與時俱進
-            this.amount = calculateCurrentAmount();
+            return calculateCurrentAmount();
         }
-        return amount;
+
+        return paidAmount;
     }
 
     /**
      * 執行繳款
      */
     public void pay() {
-        // 繳款當下，鎖定最終的罰金金額
-        this.amount = calculateCurrentAmount();
+        this.paidAmount = calculateCurrentAmount();
         this.isPaid = true;
     }
-
     // 其他 Getters
     public int getFineId() { return fineId; }
     public BorrowRecord getRecord() { return record; }
