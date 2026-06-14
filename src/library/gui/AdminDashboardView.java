@@ -73,11 +73,11 @@ public class AdminDashboardView {
         VBox profileBox = new VBox(5, nameBadge, roleBadge);
         profileBox.setPadding(new Insets(0, 0, 20, 0));
 
-        Button navReportBtn = new Button("📊 營運數據報表");
-        Button navBookBtn = new Button("📚 藏書維護與管理");
-        Button navUserBtn = new Button("👥 讀者權限審查");
-        Button navRecordBtn = new Button("📜 全館借閱與罰款");
-        Button logoutBtn = new Button("🚪 登出系統");
+        Button navReportBtn = new Button("營運數據報表");
+        Button navBookBtn = new Button("藏書維護與管理");
+        Button navUserBtn = new Button("讀者權限審查");
+        Button navRecordBtn = new Button("全館借閱與罰款");
+        Button logoutBtn = new Button("登出系統");
 
         Button[] navButtons = {navReportBtn, navBookBtn, navUserBtn, navRecordBtn, logoutBtn};
         for (Button btn : navButtons) {
@@ -125,7 +125,7 @@ public class AdminDashboardView {
         VBox box = new VBox(20);
         box.setPadding(new Insets(30));
 
-        Label header = new Label("📊 圖書館營運數據與 KPI 看板");
+        Label header = new Label("圖書館營運數據與 KPI 看板");
         header.setFont(Font.font("System", FontWeight.BOLD, 22));
 
         // KPI 看板區
@@ -286,7 +286,7 @@ public class AdminDashboardView {
         roleCombo.setValue("VIP");
         roleCombo.setStyle(AppStyle.textField());
 
-        Button changeRoleBtn = new Button("⭐ 變更選定讀者身分");
+        Button changeRoleBtn = new Button("變更選定讀者身分");
         changeRoleBtn.setStyle(AppStyle.buttonPrimary());
         changeRoleBtn.setOnAction(e -> handleAsyncChangeUserRole(roleCombo.getValue()));
 
@@ -303,7 +303,7 @@ public class AdminDashboardView {
         VBox box = new VBox(15);
         box.setPadding(new Insets(30));
 
-        Label header = new Label("📜 全館借閱紀錄與未繳罰款追蹤");
+        Label header = new Label("全館借閱紀錄與未繳罰款追蹤");
         header.setFont(Font.font("System", FontWeight.BOLD, 20));
 
         globalBorrowTable = new TableView<>(globalBorrowsData);
@@ -319,7 +319,7 @@ public class AdminDashboardView {
 
         globalBorrowTable.getColumns().addAll(bUserCol, bBookCol, bStatusCol);
 
-        Label fineHeader = new Label("💸 全館未繳清罰單總覽");
+        Label fineHeader = new Label("全館未繳清罰單總覽");
         fineHeader.setFont(Font.font("System", FontWeight.BOLD, 16));
         fineHeader.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
 
@@ -389,7 +389,7 @@ public class AdminDashboardView {
         };
         task.setOnSucceeded(e -> {
             if (task.getValue()) {
-                showAlert("成功", "✅ 新書已建檔入庫！");
+                showAlert("成功", "新書已建檔入庫！");
                 for (TextField f : fields) f.clear();
                 asyncLoadBooks("");
             } else showAlert("失敗", "上架作業失敗。");
@@ -406,9 +406,9 @@ public class AdminDashboardView {
         };
         task.setOnSucceeded(e -> {
             if (task.getValue()) {
-                showAlert("成功", "🗑️ 書籍已成功下架！");
+                showAlert("成功", "書籍已成功下架！");
                 asyncLoadBooks("");
-            } else showAlert("失敗", "❌ 下架失敗，可能該書目前正被借出中。");
+            } else showAlert("失敗", "下架失敗，可能該書目前正被借出中。");
         });
         new Thread(task).start();
     }
@@ -441,7 +441,7 @@ public class AdminDashboardView {
         };
         task.setOnSucceeded(e -> {
             if (task.getValue()) {
-                showAlert("成功", "⭐ 已變更該讀者身分為 " + newRole);
+                showAlert("成功", "已變更該讀者身分為 " + newRole);
                 asyncLoadUsers();
             } else showAlert("失敗", "身分變更失敗。");
         });

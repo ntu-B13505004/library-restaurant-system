@@ -41,10 +41,10 @@
      - getAllBorrowRecords
    - [FineService.java](service/FineService.java)
      - createOrUpdateFine
-     - payFine
-     - getUnpaidFinesByUser
-     - getTotalUnpaidAmount
-     - getAllUnpaidFines
+     - payFine ***[Y]***
+     - getUnpaidFinesByUser 
+     - getTotalUnpaidAmount 
+     - getAllUnpaidFines ***[Y]***
    - [ReportService.java](service/ReportService.java)
      - getBookSubjectPopularity
      - getTop5BorrowedBooks

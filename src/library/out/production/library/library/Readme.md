@@ -41,9 +41,9 @@
      - getAllBorrowRecords
    - [FineService.java](service/FineService.java)
      - createOrUpdateFine
-     - payFine
-     - getUnpaidFinesByUser
-     - getTotalUnpaidAmount
+     - payFine ***[Y]***
+     - getUnpaidFinesByUser 
+     - getTotalUnpaidAmount 
      - getAllUnpaidFines
    - [ReportService.java](service/ReportService.java)
      - getBookSubjectPopularity
@@ -57,10 +57,15 @@
      - updateUserRole 
      - getUserById
      - getUserByStudentNo
-     - getAllStudents
+     - getAllStudents ***[Y]***
 5. gui
    - [AdminDashboardView.java](gui/AdminDashboardView.java)
    - [AppStyle.java](gui/AppStyle.java)
    - [LoginView.java](gui/LoginView.java)
    - [RegisterView.java](gui/RegisterView.java)
    - [UserDashboardView.java](gui/UserDashboardView.java)
+
+### problem 
+    罰金機制有問題，應更改成過期就開始有罰金
+    User介面借還書不會更新
+    Admin新增功能
