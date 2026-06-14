@@ -1,5 +1,6 @@
 package library.gui;
 
+import javafx.concurrent.Task;
 import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -23,7 +24,8 @@ public class RegisterView {
         root.setStyle("-fx-background-color: " + AppStyle.BG_WINDOW + ";");
 
         VBox card = new VBox(15);
-        card.setStyle(AppStyle.card());
+        // 卡片樣式
+        card.setStyle("-fx-background-color: white; -fx-background-radius: 10; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 10, 0, 0, 4);");
         card.setPadding(new Insets(35, 45, 35, 45));
         card.setMaxWidth(420);
 
@@ -66,6 +68,9 @@ public class RegisterView {
         backBtn.setMaxWidth(Double.MAX_VALUE);
         backBtn.setPrefHeight(38);
 
+        // ==========================================
+        // 核心非同步註冊邏輯
+        // ==========================================
         regBtn.setOnAction(e -> {
             String sno = snoField.getText().trim();
             String name = nameField.getText().trim();
@@ -73,21 +78,55 @@ public class RegisterView {
             String cpwd = confirmPwdField.getText();
             String role = roleCombo.getValue();
 
+            // 前端基本驗證
             if (!pwd.equals(cpwd)) {
                 msgLabel.setText("❌ 兩次密碼輸入不一致！");
                 msgLabel.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
                 return;
             }
 
-            String res = userService.registerUser(sno, name, pwd, role);
-            if ("SUCCESS".equals(res)) {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "🎉 註冊成功！將為您返回登入頁面。", ButtonType.OK);
-                alert.showAndWait();
-                new LoginView(stage).show();
-            } else {
-                msgLabel.setText(res);
+            // 1. UI 防呆
+            regBtn.setDisable(true);
+            regBtn.setText("註冊處理中...");
+            msgLabel.setText("");
+
+            // 2. 建立非同步註冊任務
+            Task<String> registerTask = new Task<>() {
+                @Override
+                protected String call() throws Exception {
+                    // 呼叫您寫好的 UserService 方法
+                    return userService.registerUser(sno, name, pwd, role);
+                }
+            };
+
+            // 3. 處理 Service 回傳結果
+            registerTask.setOnSucceeded(ev -> {
+                String res = registerTask.getValue();
+
+                // 恢復按鈕狀態
+                regBtn.setDisable(false);
+                regBtn.setText("完成註冊");
+
+                // 配合 UserService 邏輯："SUCCESS" 代表成功，其他字串代表錯誤訊息
+                if ("SUCCESS".equals(res)) {
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION, "🎉 註冊成功！將為您返回登入頁面。", ButtonType.OK);
+                    alert.showAndWait();
+                    new LoginView(stage).show();
+                } else {
+                    msgLabel.setText(res);
+                    msgLabel.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
+                }
+            });
+
+            // 異常處理
+            registerTask.setOnFailed(ev -> {
+                regBtn.setDisable(false);
+                regBtn.setText("完成註冊");
+                msgLabel.setText("❌ 發生預期外錯誤，請稍後再試。");
                 msgLabel.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
-            }
+            });
+
+            new Thread(registerTask).start();
         });
 
         backBtn.setOnAction(e -> new LoginView(stage).show());

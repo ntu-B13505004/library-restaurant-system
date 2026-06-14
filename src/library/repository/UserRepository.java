@@ -15,9 +15,18 @@ public class UserRepository {
      * ResultSet → User
      */
     private User mapResultSetToUser(ResultSet rs) throws SQLException {
-        // 增加安全檢查：如果 created_at 為 null，則使用 LocalDateTime.now()
-        Timestamp ts = rs.getTimestamp("created_at");
-        java.time.LocalDateTime createdAt = (ts != null) ? ts.toLocalDateTime() : java.time.LocalDateTime.now();
+        // 改用 getString 讀取
+        String createdAtStr = rs.getString("created_at");
+        java.time.LocalDateTime createdAt;
+
+        try {
+            // SQLite 的 T 格式直接替換為空白或直接 parse
+            createdAt = (createdAtStr != null)
+                    ? java.time.LocalDateTime.parse(createdAtStr.replace(" ", "T"))
+                    : java.time.LocalDateTime.now();
+        } catch (Exception e) {
+            createdAt = java.time.LocalDateTime.now();
+        }
 
         return new User(
                 rs.getInt("user_id"),

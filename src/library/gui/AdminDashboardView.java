@@ -1,354 +1,459 @@
 package library.gui;
 
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.application.Platform;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.*;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.geometry.*;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.chart.*;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
-import javafx.scene.text.*;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import library.model.*;
 import library.service.*;
-import java.util.*;
+
+import java.util.List;
+import java.util.Map;
 
 public class AdminDashboardView {
     private final Stage stage;
-    private final Map<String, Object> session;
+    private final int adminId;
+    private final String adminName;
 
     private final BookService bookService = new BookService();
     private final UserService userService = new UserService();
+    private final ReportService reportService = new ReportService();
     private final BorrowService borrowService = new BorrowService();
     private final FineService fineService = new FineService();
-    private final ReportService reportService = new ReportService();
 
     private final BorderPane mainLayout = new BorderPane();
     private final StackPane contentArea = new StackPane();
 
+    private final ObservableList<Book> booksData = FXCollections.observableArrayList();
+    private final ObservableList<Map<String, Object>> usersData = FXCollections.observableArrayList();
+    private final ObservableList<BorrowRecord> globalBorrowsData = FXCollections.observableArrayList();
+    private final ObservableList<Fine> globalFinesData = FXCollections.observableArrayList();
+
+    private TableView<Book> bookTable;
+    private TableView<Map<String, Object>> userTable;
+    private TableView<BorrowRecord> globalBorrowTable;
+    private TableView<Fine> globalFineTable;
+
     public AdminDashboardView(Stage stage, Map<String, Object> session) {
         this.stage = stage;
-        this.session = session;
+        this.adminId = (int) session.get("userId");
+        this.adminName = (String) session.get("name");
     }
 
     public void show() {
         mainLayout.setStyle("-fx-background-color: " + AppStyle.BG_WINDOW + ";");
 
-        // --- 左側管理導覽列 ---
+        // 側邊欄設計
         VBox sidebar = new VBox(15);
         sidebar.setPrefWidth(240);
         sidebar.setPadding(new Insets(30, 20, 30, 20));
-        sidebar.setStyle("-fx-background-color: #1A1B41;"); // 更深色專業管理者藍
+        sidebar.setStyle("-fx-background-color: " + AppStyle.PRIMARY + ";");
 
-        Label adminTitle = new Label("中央管理系統");
-        adminTitle.setFont(Font.font("System", FontWeight.BOLD, 20));
-        adminTitle.setStyle("-fx-text-fill: white;");
+        Label nameBadge = new Label(adminName + " 系統長");
+        nameBadge.setFont(Font.font("System", FontWeight.BOLD, 18));
+        nameBadge.setStyle("-fx-text-fill: white;");
+        Label roleBadge = new Label("權限階級: SYSTEM_ADMIN");
+        roleBadge.setStyle("-fx-text-fill: " + AppStyle.ACCENT_LIGHT + "; -fx-font-size: 12px;");
 
-        Label statusLbl = new Label("權限: 系統管理員");
-        statusLbl.setStyle("-fx-text-fill: " + AppStyle.SUCCESS + "; -fx-font-size: 12px;");
-        VBox titleBox = new VBox(5, adminTitle, statusLbl);
-        titleBox.setPadding(new Insets(0, 0, 20, 0));
+        VBox profileBox = new VBox(5, nameBadge, roleBadge);
+        profileBox.setPadding(new Insets(0, 0, 20, 0));
 
-        Button navKpiBtn = new Button("📊 營運指標與圖表");
-        Button navBookBtn = new Button("📚 全院館藏管理");
-        Button navUserBtn = new Button("👥 學生權限稽核");
-        Button navLogBtn = new Button("🔍 全校借閱審查");
-        Button logoutBtn = new Button("🚪 登出控制台");
+        Button navReportBtn = new Button("📊 營運數據報表");
+        Button navBookBtn = new Button("📚 藏書維護與管理");
+        Button navUserBtn = new Button("👥 讀者權限審查");
+        Button navRecordBtn = new Button("📜 全館借閱與罰款");
+        Button logoutBtn = new Button("🚪 登出系統");
 
-        for (Button btn : new Button[]{navKpiBtn, navBookBtn, navUserBtn, navLogBtn, logoutBtn}) {
+        Button[] navButtons = {navReportBtn, navBookBtn, navUserBtn, navRecordBtn, logoutBtn};
+        for (Button btn : navButtons) {
             btn.setMaxWidth(Double.MAX_VALUE);
             btn.setPrefHeight(40);
             btn.setAlignment(Pos.CENTER_LEFT);
-            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ECF0F1; -fx-font-size: 14px; -fx-cursor: hand;");
+            if (btn == logoutBtn) {
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #E74C3C; -fx-font-weight: bold; -fx-cursor: hand;");
+            } else {
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #ECF0F1; -fx-font-size: 14px; -fx-cursor: hand;");
+            }
         }
 
-        navKpiBtn.setOnAction(e -> switchPage(buildKpiPage()));
-        navBookBtn.setOnAction(e -> switchPage(buildBookManagerPage()));
-        navUserBtn.setOnAction(e -> switchPage(buildUserManagerPage()));
-        navLogBtn.setOnAction(e -> switchPage(buildAuditPage()));
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+        sidebar.getChildren().addAll(profileBox, new Separator(), navReportBtn, navBookBtn, navUserBtn, navRecordBtn, spacer, logoutBtn);
+
+        // 路由綁定
+        navReportBtn.setOnAction(e -> switchPage(buildReportPage()));
+        navBookBtn.setOnAction(e -> { switchPage(buildBookManagementPage()); asyncLoadBooks(""); });
+        navUserBtn.setOnAction(e -> { switchPage(buildUserManagementPage()); asyncLoadUsers(); });
+        navRecordBtn.setOnAction(e -> { switchPage(buildGlobalRecordPage()); asyncLoadRecords(); });
         logoutBtn.setOnAction(e -> new LoginView(stage).show());
 
-        sidebar.getChildren().addAll(titleBox, new Separator(), navKpiBtn, navBookBtn, navUserBtn, navLogBtn, new Spacer(), logoutBtn);
         mainLayout.setLeft(sidebar);
         mainLayout.setCenter(contentArea);
 
-        switchPage(buildKpiPage()); // 預設頁
+        // 預設進入報表頁面
+        switchPage(buildReportPage());
 
-        Scene scene = new Scene(mainLayout, 1150, 720);
+        Scene scene = new Scene(mainLayout, 1100, 700);
         stage.setScene(scene);
-        stage.setTitle("圖書館管理員核心後台");
-        stage.centerOnScreen();
+        stage.setTitle("智慧圖書館 - 最高權限管理後台");
+        stage.show();
     }
 
-    private void switchPage(VBox page) {
-        contentArea.getChildren().clear();
-        contentArea.getChildren().add(page);
+    private void switchPage(Pane page) {
+        contentArea.getChildren().setAll(page);
     }
 
-    // --- 頁面 1: 營運指標與視覺化圖表 ---
-    private VBox buildKpiPage() {
-        VBox box = new VBox(25);
+    // ==========================================
+    // 📊 營運數據報表頁面 (完全串接 ReportService)
+    // ==========================================
+    private Pane buildReportPage() {
+        VBox box = new VBox(20);
         box.setPadding(new Insets(30));
 
-        Label heading = new Label("圖書館關鍵績效指標 (KPI)");
-        heading.setFont(Font.font("System", FontWeight.BOLD, 22));
+        Label header = new Label("📊 圖書館營運數據與 KPI 看板");
+        header.setFont(Font.font("System", FontWeight.BOLD, 22));
 
-        GridPane grid = new GridPane();
-        grid.setHgap(20);
-        grid.setVgap(20);
-
-        // 動態從資料庫撈取 KPI 摘要卡片
+        // KPI 看板區
+        HBox kpiBox = new HBox(20);
+        kpiBox.setAlignment(Pos.CENTER_LEFT);
         Map<String, Integer> kpis = reportService.getLibraryGeneralKPIs();
-        Map<String, Object> fines = reportService.getLibraryFineSummary();
+        Map<String, Object> finesSummary = reportService.getLibraryFineSummary();
 
-        int i = 0;
-        for (var entry : kpis.entrySet()) {
-            VBox card = createKpiCard(entry.getKey(), String.valueOf(entry.getValue()), AppStyle.PRIMARY);
-            grid.add(card, i++, 0);
-        }
-        if (fines.containsKey("未繳罰款總金額")) {
-            grid.add(createKpiCard("未收逾期罰金", "$" + fines.get("未繳罰款總金額") + " 元", AppStyle.DANGER), i, 0);
-        }
+        kpiBox.getChildren().addAll(
+                createKpiCard("總藏書量", String.valueOf(kpis.getOrDefault("總藏書量", 0))),
+                createKpiCard("在外借出", String.valueOf(kpis.getOrDefault("目前借出冊數", 0))),
+                createKpiCard("停權人數", String.valueOf(kpis.getOrDefault("停權學生人數", 0))),
+                createKpiCard("未收罰金", "$ " + finesSummary.getOrDefault("未繳罰款總金額", 0))
+        );
 
-        // 核心亮點功能：加入分析書籍主題受歡迎程度的圓餅圖 (PieChart)
-        Label chartTitle = new Label("📊 各主題文獻借閱熱度分佈統計");
-        chartTitle.setFont(Font.font("System", FontWeight.BOLD, 16));
-
-        PieChart pieChart = new PieChart();
-        pieChart.setLegendSide(Side.RIGHT);
-
-        Map<String, Integer> subjectData = reportService.getBookSubjectPopularity();
-        for (var entry : subjectData.entrySet()) {
-            pieChart.getData().add(new PieChart.Data(entry.getKey() + " (" + entry.getValue() + "次)", entry.getValue()));
-        }
-
-        VBox chartBox = new VBox(10, chartTitle, pieChart);
-        chartBox.setStyle(AppStyle.card());
-        chartBox.setPadding(new Insets(20));
+        // 圖表區 (主題分佈圓餅圖 + 熱門書籍長條圖)
+        HBox chartBox = new HBox(20);
         VBox.setVgrow(chartBox, Priority.ALWAYS);
 
-        box.getChildren().addAll(heading, grid, chartBox);
+        // 圓餅圖：書籍主題受歡迎度
+        PieChart pieChart = new PieChart();
+        pieChart.setTitle("熱門借閱主題分佈");
+        Map<String, Integer> subjectData = reportService.getBookSubjectPopularity();
+        subjectData.forEach((subject, count) -> pieChart.getData().add(new PieChart.Data(subject, count)));
+
+        // 長條圖：Top 5 借閱書籍
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        BarChart<String, Number> barChart = new BarChart<>(xAxis, yAxis);
+        barChart.setTitle("全校熱門借閱排行榜 Top 5");
+        barChart.setLegendVisible(false);
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        Map<String, Integer> topBooks = reportService.getTop5BorrowedBooks();
+        topBooks.forEach((title, count) -> series.getData().add(new XYChart.Data<>(title, count)));
+        barChart.getData().add(series);
+
+        HBox.setHgrow(pieChart, Priority.ALWAYS);
+        HBox.setHgrow(barChart, Priority.ALWAYS);
+        chartBox.getChildren().addAll(pieChart, barChart);
+
+        box.getChildren().addAll(header, kpiBox, new Separator(), chartBox);
         return box;
     }
 
-    private VBox createKpiCard(String title, String value, String colorHex) {
+    private VBox createKpiCard(String title, String value) {
         VBox card = new VBox(10);
-        card.setStyle(AppStyle.card());
-        card.setPadding(new Insets(20));
-        card.setPrefWidth(200);
-
-        Label tLbl = new Label(title);
-        tLbl.setStyle("-fx-text-fill: " + AppStyle.TEXT_SECONDARY + "; -fx-font-size: 14px;");
-        Label vLbl = new Label(value);
-        vLbl.setFont(Font.font("System", FontWeight.BOLD, 24));
-        vLbl.setStyle("-fx-text-fill: " + colorHex + ";");
-
-        card.getChildren().addAll(tLbl, vLbl);
+        card.setPadding(new Insets(15));
+        card.setStyle("-fx-background-color: white; -fx-background-radius: 8; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);");
+        card.setPrefWidth(180);
+        Label tLabel = new Label(title);
+        tLabel.setStyle("-fx-text-fill: #7F8C8D; -fx-font-size: 14px;");
+        Label vLabel = new Label(value);
+        vLabel.setFont(Font.font("System", FontWeight.BOLD, 24));
+        vLabel.setStyle("-fx-text-fill: " + AppStyle.PRIMARY + ";");
+        card.getChildren().addAll(tLabel, vLabel);
         return card;
     }
 
-    // --- 頁面 2: 全院館藏管理 (上架/下架) ---
-    private VBox buildBookManagerPage() {
-        VBox box = new VBox(20);
+    // ==========================================
+    // 📚 藏書維護與管理 (包含檢索與下架)
+    // ==========================================
+    private Pane buildBookManagementPage() {
+        VBox box = new VBox(15);
         box.setPadding(new Insets(30));
 
-        Label heading = new Label("全館文獻資產管理中心");
-        heading.setFont(Font.font("System", FontWeight.BOLD, 22));
+        Label header = new Label("📚 館藏圖書維護作業");
+        header.setFont(Font.font("System", FontWeight.BOLD, 20));
 
-        // 書籍表格
-        TableView<Book> table = new TableView<>();
-        TableColumn<Book, Integer> idCol = new TableColumn<>("書籍ID");
-        idCol.setCellValueFactory(new PropertyValueFactory<>("bookId"));
-        TableColumn<Book, String> tCol = new TableColumn<>("書名");
-        tCol.setCellValueFactory(new PropertyValueFactory<>("title"));
-        tCol.setPrefWidth(200);
-        TableColumn<Book, String> aCol = new TableColumn<>("作者");
-        aCol.setCellValueFactory(new PropertyValueFactory<>("authors"));
-        TableColumn<Book, String> sCol = new TableColumn<>("主題分類");
-        sCol.setCellValueFactory(new PropertyValueFactory<>("subjects"));
-        TableColumn<Book, String> stCol = new TableColumn<>("狀態");
-        stCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getStatus().name()));
+        // 搜尋列
+        HBox searchBox = new HBox(10);
+        TextField searchField = new TextField();
+        searchField.setPromptText("輸入關鍵字搜尋書籍...");
+        searchField.setStyle(AppStyle.textField());
+        Button searchBtn = new Button("檢索");
+        searchBtn.setStyle(AppStyle.buttonSecondary());
+        searchBtn.setOnAction(e -> asyncLoadBooks(searchField.getText()));
+        searchBox.getChildren().addAll(searchField, searchBtn);
 
-        table.getColumns().addAll(idCol, tCol, aCol, sCol, stCol);
-        VBox.setVgrow(table, Priority.ALWAYS);
+        bookTable = new TableView<>(booksData);
+        bookTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        VBox.setVgrow(bookTable, Priority.ALWAYS);
 
-        Runnable refreshBooks = () -> table.setItems(FXCollections.observableArrayList(bookService.getAllBooks()));
-        refreshBooks.run();
+        TableColumn<Book, Integer> idCol = new TableColumn<>("編號");
+        idCol.setCellValueFactory(c -> new SimpleIntegerProperty(c.getValue().getBookId()).asObject());
+        idCol.setMaxWidth(60);
 
-        // 表單：新書上架
-        HBox form = new HBox(10);
-        form.setAlignment(Pos.CENTER_LEFT);
-        TextField tIn = new TextField(); tIn.setPromptText("書名 (必填)"); tIn.setStyle(AppStyle.textField());
-        TextField aIn = new TextField(); aIn.setPromptText("作者"); aIn.setStyle(AppStyle.textField());
-        TextField sIn = new TextField(); sIn.setPromptText("主題"); sIn.setStyle(AppStyle.textField());
-        Button addBtn = new Button("📥 新書採購上架"); addBtn.setStyle(AppStyle.buttonPrimary());
-        Button delBtn = new Button("❌ 強制登錄下架"); delBtn.setStyle(AppStyle.buttonSecondary());
+        TableColumn<Book, String> titleCol = new TableColumn<>("書名");
+        titleCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getTitle()));
 
-        form.getChildren().addAll(tIn, aIn, sIn, addBtn, delBtn);
+        TableColumn<Book, String> authorCol = new TableColumn<>("作者");
+        authorCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getAuthors()));
 
-        // 上架事件
-        addBtn.setOnAction(e -> {
-            String title = tIn.getText().trim();
-            if (title.isEmpty()) { showAlert("錯誤", "書名為必填欄位！"); return; }
-            Book b = new Book(0, title, aIn.getText(), sIn.getText(), "", "", "", "", "", "");
-            if (bookService.addBook(b)) {
-                showAlert("成功", "書籍《" + title + "》已成功登錄入庫。");
-                refreshBooks.run();
-                tIn.clear(); aIn.clear(); sIn.clear();
-            }
-        });
+        TableColumn<Book, String> statusCol = new TableColumn<>("狀態");
+        statusCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getStatus().name()));
 
-        // 下架事件 (包含借出中不能刪除的安全檢查)
-        delBtn.setOnAction(e -> {
-            Book sel = table.getSelectionModel().getSelectedItem();
-            if (sel == null) { showAlert("提示", "請先選擇要下架的書籍。"); return; }
+        bookTable.getColumns().addAll(idCol, titleCol, authorCol, statusCol);
 
-            boolean res = bookService.removeBook(sel.getBookId());
-            if (res) {
-                showAlert("成功", "該圖書館藏已安全除籍。");
-                refreshBooks.run();
-            } else {
-                showAlert("除籍被拒", "❌ 無法下架該書籍！該圖書目前正被學生借閱中，移除將破壞內部稽核完整性。");
-            }
-        });
+        // 管理操作區 (上架與下架)
+        HBox opsBox = new HBox(10);
+        opsBox.setAlignment(Pos.CENTER_LEFT);
 
-        box.getChildren().addAll(heading, table, form);
+        TextField tTitle = new TextField(); tTitle.setPromptText("新書書名"); tTitle.setStyle(AppStyle.textField());
+        TextField tAuthor = new TextField(); tAuthor.setPromptText("作者"); tAuthor.setStyle(AppStyle.textField());
+        TextField tSubject = new TextField(); tSubject.setPromptText("主題"); tSubject.setStyle(AppStyle.textField());
+
+        Button addBtn = new Button("➕ 登記上架");
+        addBtn.setStyle(AppStyle.buttonPrimary());
+        addBtn.setOnAction(e -> handleAsyncAddBook(tTitle.getText(), tAuthor.getText(), tSubject.getText(), tTitle, tAuthor, tSubject));
+
+        Button delBtn = new Button("🗑️ 下架選定書籍");
+        delBtn.setStyle("-fx-background-color: #E74C3C; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
+        delBtn.setOnAction(e -> handleAsyncRemoveBook());
+
+        Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
+        opsBox.getChildren().addAll(tTitle, tAuthor, tSubject, addBtn, spacer, delBtn);
+
+        box.getChildren().addAll(header, searchBox, bookTable, new Separator(), opsBox);
         return box;
     }
 
-    // --- 頁面 3: 學生權限稽核 (狀態修改/角色調整) ---
-    private VBox buildUserManagerPage() {
-        VBox box = new VBox(20);
+    // ==========================================
+    // 👥 讀者權限審查 (增加會員等級調整)
+    // ==========================================
+    private Pane buildUserManagementPage() {
+        VBox box = new VBox(15);
         box.setPadding(new Insets(30));
 
-        Label heading = new Label("全校讀者權限與身分稽核");
-        heading.setFont(Font.font("System", FontWeight.BOLD, 22));
+        Label header = new Label("👥 全校讀者狀態與權限審查");
+        header.setFont(Font.font("System", FontWeight.BOLD, 20));
 
-        HBox filterBar = new HBox(10);
-        TextField fIn = new TextField(); fIn.setPromptText("依學號精準過濾..."); fIn.setStyle(AppStyle.textField());
-        Button filterBtn = new Button("過濾篩選"); filterBtn.setStyle(AppStyle.buttonPrimary());
-        filterBar.getChildren().addAll(fIn, filterBtn);
-
-        TableView<Map<String, Object>> table = new TableView<>();
-        TableColumn<Map<String, Object>, Integer> idCol = new TableColumn<>("使用者ID");
-        idCol.setCellValueFactory(cell -> new SimpleObjectProperty<>((Integer) cell.getValue().get("userId")));
+        userTable = new TableView<>(usersData);
+        userTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        VBox.setVgrow(userTable, Priority.ALWAYS);
 
         TableColumn<Map<String, Object>, String> snoCol = new TableColumn<>("學號");
-        snoCol.setCellValueFactory(cell -> new SimpleStringProperty((String) cell.getValue().get("studentNo")));
+        snoCol.setCellValueFactory(c -> new SimpleStringProperty((String) c.getValue().get("studentNo")));
 
-        TableColumn<Map<String, Object>, String> nCol = new TableColumn<>("姓名");
-        nCol.setCellValueFactory(cell -> new SimpleStringProperty((String) cell.getValue().get("name")));
+        TableColumn<Map<String, Object>, String> unameCol = new TableColumn<>("姓名");
+        unameCol.setCellValueFactory(c -> new SimpleStringProperty((String) c.getValue().get("name")));
 
-        TableColumn<Map<String, Object>, String> rCol = new TableColumn<>("會員級別");
-        rCol.setCellValueFactory(cell -> new SimpleStringProperty((String) cell.getValue().get("roleLevel")));
+        TableColumn<Map<String, Object>, String> uRoleCol = new TableColumn<>("身分別");
+        uRoleCol.setCellValueFactory(c -> new SimpleStringProperty((String) c.getValue().get("roleLevel")));
 
-        TableColumn<Map<String, Object>, String> sCol = new TableColumn<>("權限狀態");
-        sCol.setCellValueFactory(cell -> new SimpleStringProperty((String) cell.getValue().get("status")));
-        sCol.setCellFactory(column -> new TableCell<>() {
-            @Override protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) { setGraphic(null); setText(null); }
-                else {
-                    Label l = new Label(item);
-                    l.setStyle("ACTIVE".equals(item) ? AppStyle.chipAvailable() : AppStyle.chipSuspended());
-                    setGraphic(l);
-                }
-            }
-        });
+        TableColumn<Map<String, Object>, String> uStatusCol = new TableColumn<>("帳號狀態");
+        uStatusCol.setCellValueFactory(c -> new SimpleStringProperty((String) c.getValue().get("status")));
 
-        table.getColumns().addAll(idCol, snoCol, nCol, rCol, sCol);
-        VBox.setVgrow(table, Priority.ALWAYS);
+        userTable.getColumns().addAll(snoCol, unameCol, uRoleCol, uStatusCol);
 
-        Runnable loadUsers = () -> table.setItems(FXCollections.observableArrayList(userService.getAllStudents(fIn.getText())));
-        filterBtn.setOnAction(e -> loadUsers.run());
-        loadUsers.run();
+        HBox opsBox = new HBox(10);
+        opsBox.setAlignment(Pos.CENTER_LEFT);
 
-        // 權限操作面板
-        HBox ops = new HBox(15);
-        ops.setAlignment(Pos.CENTER_LEFT);
+        Button toggleStatusBtn = new Button("⚡ 切換帳號狀態 (停權/復權)");
+        toggleStatusBtn.setStyle(AppStyle.buttonSecondary());
+        toggleStatusBtn.setOnAction(e -> handleAsyncToggleUserStatus());
 
-        ComboBox<String> statusCombo = new ComboBox<>(); statusCombo.getItems().addAll("ACTIVE", "SUSPENDED"); statusCombo.setPromptText("變更狀態");
-        Button updateStatusBtn = new Button("修改狀態"); updateStatusBtn.setStyle(AppStyle.buttonPrimary());
+        ComboBox<String> roleCombo = new ComboBox<>();
+        roleCombo.getItems().addAll("NORMAL", "VIP");
+        roleCombo.setValue("VIP");
+        roleCombo.setStyle(AppStyle.textField());
 
-        ComboBox<String> roleCombo = new ComboBox<>(); roleCombo.getItems().addAll("NORMAL", "VIP"); roleCombo.setPromptText("升降身分");
-        Button updateRoleBtn = new Button("調整級別"); updateRoleBtn.setStyle(AppStyle.buttonSecondary());
+        Button changeRoleBtn = new Button("⭐ 變更選定讀者身分");
+        changeRoleBtn.setStyle(AppStyle.buttonPrimary());
+        changeRoleBtn.setOnAction(e -> handleAsyncChangeUserRole(roleCombo.getValue()));
 
-        ops.getChildren().addAll(new Label("狀態稽核:"), statusCombo, updateStatusBtn, new Separator(), new Label("級別調配:"), roleCombo, updateRoleBtn);
+        opsBox.getChildren().addAll(toggleStatusBtn, new Label(" | "), roleCombo, changeRoleBtn);
 
-        updateStatusBtn.setOnAction(e -> {
-            var sel = table.getSelectionModel().getSelectedItem();
-            if (sel == null || statusCombo.getValue() == null) return;
-            int uid = (int) sel.get("userId");
-            if (userService.updateUserStatus(uid, statusCombo.getValue())) {
-                showAlert("變更成功", "讀者狀態已切換為 " + statusCombo.getValue());
-                loadUsers.run();
-            }
-        });
-
-        updateRoleBtn.setOnAction(e -> {
-            var sel = table.getSelectionModel().getSelectedItem();
-            if (sel == null || roleCombo.getValue() == null) return;
-            int uid = (int) sel.get("userId");
-            if (userService.updateUserRole(uid, roleCombo.getValue())) {
-                showAlert("變更成功", "讀者身分已成功轉發為 " + roleCombo.getValue());
-                loadUsers.run();
-            }
-        });
-
-        box.getChildren().addAll(heading, filterBar, table, ops);
+        box.getChildren().addAll(header, userTable, opsBox);
         return box;
     }
 
-    // --- 頁面 4: 全校借閱歷史審查 ---
-    private VBox buildAuditPage() {
-        VBox box = new VBox(20);
+    // ==========================================
+    // 📜 全館借閱與罰款總覽
+    // ==========================================
+    private Pane buildGlobalRecordPage() {
+        VBox box = new VBox(15);
         box.setPadding(new Insets(30));
 
-        Label heading = new Label("全校借閱交易流水審查紀錄");
-        heading.setFont(Font.font("System", FontWeight.BOLD, 22));
+        Label header = new Label("📜 全館借閱紀錄與未繳罰款追蹤");
+        header.setFont(Font.font("System", FontWeight.BOLD, 20));
 
-        TableView<BorrowRecord> table = new TableView<>();
-        TableColumn<BorrowRecord, Integer> idCol = new TableColumn<>("紀錄ID");
-        idCol.setCellValueFactory(new PropertyValueFactory<>("recordId"));
+        globalBorrowTable = new TableView<>(globalBorrowsData);
+        globalBorrowTable.setPrefHeight(200);
+        globalBorrowTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        TableColumn<BorrowRecord, String> stuCol = new TableColumn<>("借閱學生");
-        stuCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getUser().getName() + " (" + cell.getValue().getUser().getStudentNo() + ")"));
-        stuCol.setPrefWidth(160);
+        TableColumn<BorrowRecord, String> bUserCol = new TableColumn<>("借閱人 (學號)");
+        bUserCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getUser().getStudentNo()));
+        TableColumn<BorrowRecord, String> bBookCol = new TableColumn<>("借閱書籍");
+        bBookCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getBook().getTitle()));
+        TableColumn<BorrowRecord, String> bStatusCol = new TableColumn<>("歸還狀態");
+        bStatusCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getReturnDate() == null ? "未歸還" : "已歸還"));
 
-        TableColumn<BorrowRecord, String> bkCol = new TableColumn<>("借閱書名");
-        bkCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getBook().getTitle()));
-        bkCol.setPrefWidth(180);
+        globalBorrowTable.getColumns().addAll(bUserCol, bBookCol, bStatusCol);
 
-        TableColumn<BorrowRecord, String> bdCol = new TableColumn<>("借出日期");
-        bdCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getBorrowDate().toString().substring(0,16)));
+        Label fineHeader = new Label("💸 全館未繳清罰單總覽");
+        fineHeader.setFont(Font.font("System", FontWeight.BOLD, 16));
+        fineHeader.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
 
-        TableColumn<BorrowRecord, String> rdCol = new TableColumn<>("歸還狀態");
-        rdCol.setCellValueFactory(cell -> {
-            var d = cell.getValue().getReturnDate();
-            return new SimpleStringProperty(d == null ? "⚠️ 在外未還" : "已歸還 (" + d.toString().substring(0,10) + ")");
-        });
-        rdCol.setPrefWidth(150);
+        globalFineTable = new TableView<>(globalFinesData);
+        globalFineTable.setPrefHeight(200);
+        globalFineTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        table.getColumns().addAll(idCol, stuCol, bkCol, bdCol, rdCol);
-        VBox.setVgrow(table, Priority.ALWAYS);
+        TableColumn<Fine, String> fUserCol = new TableColumn<>("違規學號");
+        fUserCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getRecord().getUser().getStudentNo()));
+        TableColumn<Fine, String> fAmtCol = new TableColumn<>("未繳金額");
+        fAmtCol.setCellValueFactory(c -> new SimpleStringProperty("$ " + c.getValue().getAmount()));
 
-        table.setItems(FXCollections.observableArrayList(borrowService.getAllBorrowRecords(null)));
+        globalFineTable.getColumns().addAll(fUserCol, fAmtCol);
 
-        box.getChildren().addAll(heading, table);
+        box.getChildren().addAll(header, new Label("所有借閱紀錄："), globalBorrowTable, new Separator(), fineHeader, globalFineTable);
         return box;
+    }
+
+    // ==========================================
+    // 異步背景任務與事件綁定
+    // ==========================================
+    private void asyncLoadBooks(String keyword) {
+        bookTable.setPlaceholder(new ProgressIndicator());
+        Task<List<Book>> task = new Task<>() {
+            @Override protected List<Book> call() throws Exception {
+                return bookService.searchBooks(keyword);
+            }
+        };
+        task.setOnSucceeded(e -> booksData.setAll(task.getValue()));
+        new Thread(task).start();
+    }
+
+    private void asyncLoadUsers() {
+        userTable.setPlaceholder(new ProgressIndicator());
+        Task<List<Map<String, Object>>> task = new Task<>() {
+            @Override protected List<Map<String, Object>> call() throws Exception {
+                return userService.getAllStudents("");
+            }
+        };
+        task.setOnSucceeded(e -> usersData.setAll(task.getValue()));
+        new Thread(task).start();
+    }
+
+    private void asyncLoadRecords() {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
+                List<BorrowRecord> borrows = borrowService.getAllBorrowRecords("");
+                List<Fine> fines = fineService.getAllUnpaidFines();
+                Platform.runLater(() -> {
+                    globalBorrowsData.setAll(borrows);
+                    globalFinesData.setAll(fines);
+                });
+                return null;
+            }
+        };
+        new Thread(task).start();
+    }
+
+    private void handleAsyncAddBook(String title, String author, String subject, TextField... fields) {
+        if (title.isEmpty() || author.isEmpty()) {
+            showAlert("提示", "書名與作者為必填欄位。"); return;
+        }
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() {
+                return bookService.addBook(new Book(0, title, author, subject, "", "", "", "", "", ""));
+            }
+        };
+        task.setOnSucceeded(e -> {
+            if (task.getValue()) {
+                showAlert("成功", "✅ 新書已建檔入庫！");
+                for (TextField f : fields) f.clear();
+                asyncLoadBooks("");
+            } else showAlert("失敗", "上架作業失敗。");
+        });
+        new Thread(task).start();
+    }
+
+    private void handleAsyncRemoveBook() {
+        Book selected = bookTable.getSelectionModel().getSelectedItem();
+        if (selected == null) { showAlert("提示", "請選擇要下架的書籍。"); return; }
+
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() { return bookService.removeBook(selected.getBookId()); }
+        };
+        task.setOnSucceeded(e -> {
+            if (task.getValue()) {
+                showAlert("成功", "🗑️ 書籍已成功下架！");
+                asyncLoadBooks("");
+            } else showAlert("失敗", "❌ 下架失敗，可能該書目前正被借出中。");
+        });
+        new Thread(task).start();
+    }
+
+    private void handleAsyncToggleUserStatus() {
+        Map<String, Object> selectedUser = userTable.getSelectionModel().getSelectedItem();
+        if (selectedUser == null) { showAlert("提示", "請先選取一名讀者。"); return; }
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() {
+                int uid = (Integer) selectedUser.get("userId");
+                String current = (String) selectedUser.get("status");
+                return userService.updateUserStatus(uid, "ACTIVE".equals(current) ? "SUSPENDED" : "ACTIVE");
+            }
+        };
+        task.setOnSucceeded(e -> {
+            if (task.getValue()) asyncLoadUsers();
+            else showAlert("失敗", "狀態更新失敗。");
+        });
+        new Thread(task).start();
+    }
+
+    private void handleAsyncChangeUserRole(String newRole) {
+        Map<String, Object> selectedUser = userTable.getSelectionModel().getSelectedItem();
+        if (selectedUser == null) { showAlert("提示", "請先選取一名讀者。"); return; }
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() {
+                int uid = (Integer) selectedUser.get("userId");
+                return userService.updateUserRole(uid, newRole);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            if (task.getValue()) {
+                showAlert("成功", "⭐ 已變更該讀者身分為 " + newRole);
+                asyncLoadUsers();
+            } else showAlert("失敗", "身分變更失敗。");
+        });
+        new Thread(task).start();
     }
 
     private void showAlert(String title, String content) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION, content, ButtonType.OK);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.showAndWait();
-    }
-
-    private static class Spacer extends Region {
-        public Spacer() { VBox.setVgrow(this, Priority.ALWAYS); }
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, content, ButtonType.OK);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.showAndWait();
+        });
     }
 }
