@@ -24,7 +24,7 @@ public class DatabaseManager {
                     "password TEXT NOT NULL, " +
                     "role_level TEXT, " +             // NORMAL / VIP / ADMIN
                     "status TEXT, " +                 // ACTIVE / SUSPENDED
-                    "created_at TEXT)");
+                    "created_at TEXT DEFAULT CURRENT_TIMESTAMP)");
 
             // 2. 建立書籍表
             stmt.execute("CREATE TABLE IF NOT EXISTS books (" +

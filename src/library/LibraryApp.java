@@ -1,7 +1,8 @@
-package library.gui;
+package library;
 
 import javafx.application.Application;
 import javafx.stage.Stage;
+import library.gui.*;
 
 /**
  * 圖書館借還書系統 - JavaFX 入口點
