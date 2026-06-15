@@ -129,11 +129,11 @@
       </method>
     </configuration>
     <list>
-      <item itemvalue="Application.LibraryApp" />
-      <item itemvalue="Application.Main" />
-      <item itemvalue="Application.JavaFXTest" />
-      <item itemvalue="Application.LibraryFrame" />
       <item itemvalue="Application.ComponentTest" />
+      <item itemvalue="Application.JavaFXTest" />
+      <item itemvalue="Application.LibraryApp" />
+      <item itemvalue="Application.LibraryFrame" />
+      <item itemvalue="Application.Main" />
     </list>
     <recent_temporary>
       <list>
