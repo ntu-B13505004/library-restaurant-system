@@ -34,8 +34,11 @@ public class UserDashboardView {
     private final Label nameBadge = new Label();
     private final Label roleBadge = new Label();
 
-    private final ObservableList<BorrowRecord> borrowRecordsData = FXCollections.observableArrayList();
+    // 借閱歷史（所有紀錄，含已還）
+    private final ObservableList<BorrowRecord> borrowHistoryData = FXCollections.observableArrayList();
+    // 未繳罰款
     private final ObservableList<Fine> finesData = FXCollections.observableArrayList();
+    // 書籍搜尋結果
     private final ObservableList<Book> searchBooksData = FXCollections.observableArrayList();
 
     private TableView<BorrowRecord> borrowTable;
@@ -81,14 +84,16 @@ public class UserDashboardView {
 
         Region sidebarSpacer = new Region();
         VBox.setVgrow(sidebarSpacer, Priority.ALWAYS);
-
         sidebar.getChildren().addAll(profileBox, new Separator(), navSearchBtn, navBorrowBtn, sidebarSpacer, logoutBtn);
 
         navSearchBtn.setOnAction(e -> {
             switchPage(buildBookSearchPage());
-            handleAsyncSearch(""); // 預設載入全部書籍
+            handleAsyncSearch("");
         });
-        navBorrowBtn.setOnAction(e -> switchPage(buildBorrowAndFinePage()));
+        navBorrowBtn.setOnAction(e -> {
+            switchPage(buildBorrowAndFinePage());
+            asyncRefreshUserData(); // ✅ 切換頁面時主動刷新
+        });
         logoutBtn.setOnAction(e -> new LoginView(stage).show());
 
         mainLayout.setLeft(sidebar);
@@ -108,34 +113,76 @@ public class UserDashboardView {
     }
 
     // ==========================================
-    // 我的借還與罰款控制面板頁面
+    // 💳 我的借還與罰款
     // ==========================================
     private Pane buildBorrowAndFinePage() {
         VBox box = new VBox(20);
         box.setPadding(new Insets(30));
 
-        Label borrowHeading = new Label("📚 您目前的個人借閱狀況");
+        // ---------- 借閱歷史 ----------
+        Label borrowHeading = new Label("📚 借閱歷史紀錄");
         borrowHeading.setFont(Font.font("System", FontWeight.BOLD, 18));
 
-        borrowTable = new TableView<>(borrowRecordsData);
-        borrowTable.setPrefHeight(220);
+        borrowTable = new TableView<>(borrowHistoryData);
+        borrowTable.setPrefHeight(230);
         borrowTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<BorrowRecord, String> titleCol = new TableColumn<>("書名");
-        titleCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getBook().getTitle()));
+        titleCol.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getBook().getTitle()));
 
         TableColumn<BorrowRecord, String> dateCol = new TableColumn<>("借閱日期");
-        dateCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getBorrowDate().toString().substring(0, 10)));
+        dateCol.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getBorrowDate().toString().substring(0, 10)));
+        dateCol.setMaxWidth(110);
 
         TableColumn<BorrowRecord, String> dueCol = new TableColumn<>("應還期限");
-        dueCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getDueDate().toString().substring(0, 10)));
+        dueCol.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getDueDate().toString().substring(0, 10)));
+        dueCol.setMaxWidth(110);
 
-        borrowTable.getColumns().addAll(titleCol, dateCol, dueCol);
+        // ✅ 新增「歸還狀態」欄位，顯示已還/未還/逾期未還
+        TableColumn<BorrowRecord, String> returnStatusCol = new TableColumn<>("歸還狀態");
+        returnStatusCol.setCellValueFactory(cell -> {
+            BorrowRecord r = cell.getValue();
+            String status;
+            if (r.getReturnDate() != null) {
+                status = r.isOverdue() ? "已還（逾期）" : "已還";
+            } else {
+                status = r.isOverdue() ? "⚠️ 逾期未還" : "借閱中";
+            }
+            return new SimpleStringProperty(status);
+        });
+        returnStatusCol.setMaxWidth(110);
+        // 逾期未還用紅色標示
+        returnStatusCol.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    setText(item);
+                    if (item.contains("逾期")) {
+                        setStyle("-fx-text-fill: #E74C3C; -fx-font-weight: bold;");
+                    } else if ("借閱中".equals(item)) {
+                        setStyle("-fx-text-fill: #2980B9;");
+                    } else {
+                        setStyle("-fx-text-fill: #27AE60;");
+                    }
+                }
+            }
+        });
 
+        borrowTable.getColumns().addAll(titleCol, dateCol, dueCol, returnStatusCol);
+
+        // 還書按鈕（只對未還書有效）
         Button returnBtn = new Button("↩️ 辦理選定書籍還書");
         returnBtn.setStyle(AppStyle.buttonPrimary());
         returnBtn.setOnAction(e -> handleAsyncReturn());
 
+        // ---------- 罰款明細 ----------
         Label fineHeading = new Label("⚠️ 逾期未結清帳單明細");
         fineHeading.setFont(Font.font("System", FontWeight.BOLD, 18));
         fineHeading.setStyle("-fx-text-fill: " + AppStyle.DANGER + ";");
@@ -145,12 +192,27 @@ public class UserDashboardView {
         fineTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
         TableColumn<Fine, String> fBookCol = new TableColumn<>("違規書籍");
-        fBookCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getRecord().getBook().getTitle()));
+        fBookCol.setCellValueFactory(cell ->
+                new SimpleStringProperty(cell.getValue().getRecord().getBook().getTitle()));
+
+        // ✅ 新增逾期天數欄
+        TableColumn<Fine, String> fDaysCol = new TableColumn<>("逾期天數");
+        fDaysCol.setCellValueFactory(cell -> {
+            BorrowRecord r = cell.getValue().getRecord();
+            java.time.LocalDateTime endPoint = r.getReturnDate() != null
+                    ? r.getReturnDate() : java.time.LocalDateTime.now();
+            long days = java.time.temporal.ChronoUnit.DAYS.between(
+                    r.getDueDate().toLocalDate(), endPoint.toLocalDate());
+            return new SimpleStringProperty(days > 0 ? days + " 天" : "< 1 天");
+        });
+        fDaysCol.setMaxWidth(90);
 
         TableColumn<Fine, String> fAmountCol = new TableColumn<>("累積罰金 (TWD)");
-        fAmountCol.setCellValueFactory(cell -> new SimpleStringProperty("$ " + cell.getValue().getAmount()));
+        fAmountCol.setCellValueFactory(cell ->
+                new SimpleStringProperty("$ " + cell.getValue().getAmount()));
+        fAmountCol.setMaxWidth(130);
 
-        fineTable.getColumns().addAll(fBookCol, fAmountCol);
+        fineTable.getColumns().addAll(fBookCol, fDaysCol, fAmountCol);
 
         totalFineLabel = new Label("未繳總金額：計算中...");
         totalFineLabel.setFont(Font.font("System", FontWeight.BOLD, 15));
@@ -160,15 +222,24 @@ public class UserDashboardView {
         payBtn.setStyle(AppStyle.buttonSecondary());
         payBtn.setOnAction(e -> handleAsyncPayFine());
 
-        HBox fOps = new HBox(20, totalFineLabel, payBtn);
+        // ✅ 手動刷新按鈕（罰金是動態的，刷新才能看最新累積金額）
+        Button refreshBtn = new Button("🔄 刷新");
+        refreshBtn.setStyle(AppStyle.buttonSecondary());
+        refreshBtn.setOnAction(e -> asyncRefreshUserData());
+
+        HBox fOps = new HBox(15, totalFineLabel, payBtn, refreshBtn);
         fOps.setAlignment(Pos.CENTER_LEFT);
 
-        box.getChildren().addAll(borrowHeading, borrowTable, returnBtn, new Separator(), fineHeading, fOps, fineTable);
+        box.getChildren().addAll(
+                borrowHeading, borrowTable, returnBtn,
+                new Separator(),
+                fineHeading, fOps, fineTable
+        );
         return box;
     }
 
     // ==========================================
-    // 圖書檢索與虛擬借閱頁面 (實作完成)
+    // 📖 圖書檢索與借閱
     // ==========================================
     private Pane buildBookSearchPage() {
         VBox box = new VBox(15);
@@ -186,6 +257,8 @@ public class UserDashboardView {
         Button searchBtn = new Button("🔍 搜尋");
         searchBtn.setStyle(AppStyle.buttonSecondary());
         searchBtn.setOnAction(e -> handleAsyncSearch(searchBar.getText()));
+        // 按 Enter 也能搜尋
+        searchBar.setOnAction(e -> handleAsyncSearch(searchBar.getText()));
 
         searchBox.getChildren().addAll(searchBar, searchBtn);
 
@@ -200,7 +273,10 @@ public class UserDashboardView {
         authorCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getAuthors()));
 
         TableColumn<Book, String> statusCol = new TableColumn<>("狀態");
-        statusCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getStatus().name()));
+        statusCol.setCellValueFactory(c -> new SimpleStringProperty(
+                c.getValue().getStatus() == BookStatus.AVAILABLE ? "✅ 可借" : "❌ 已借出"
+        ));
+        statusCol.setMaxWidth(90);
 
         searchTable.getColumns().addAll(titleCol, authorCol, statusCol);
 
@@ -218,26 +294,32 @@ public class UserDashboardView {
         borrowBtn.setOnAction(e -> handleAsyncBorrow(daysCombo.getValue()));
 
         borrowBox.getChildren().addAll(daysLabel, daysCombo, borrowBtn);
-
         box.getChildren().addAll(title, searchBox, searchTable, borrowBox);
         return box;
     }
 
     // ==========================================
-    // 核心非同步控制邏輯
+    // 非同步背景任務
     // ==========================================
+
+    /**
+     * 一次刷新：個人資訊 + 借閱歷史（含已還） + 未繳罰款 + 總金額
+     */
     private void asyncRefreshUserData() {
-        borrowTable.setPlaceholder(new ProgressIndicator());
-        fineTable.setPlaceholder(new ProgressIndicator());
+        // 只在 borrowTable / fineTable 已被建立後設 placeholder
+        if (borrowTable != null) borrowTable.setPlaceholder(new ProgressIndicator());
+        if (fineTable != null) fineTable.setPlaceholder(new ProgressIndicator());
 
         Task<DashboardDataPack> refreshTask = new Task<>() {
             @Override
             protected DashboardDataPack call() throws Exception {
                 User latestUser = userService.getUserById(userId);
-                List<BorrowRecord> borrows = borrowService.getUserBorrowHistory(userId);
+                // ✅ getUserBorrowHistory 取全部歷史（含已還），不只是進行中
+                List<BorrowRecord> allHistory = borrowService.getUserBorrowHistory(userId);
+                // ✅ getUnpaidFinesByUser 會觸發「逾期即開罰」掃描
                 List<Fine> unpaidFines = fineService.getUnpaidFinesByUser(userId);
                 int totalFine = fineService.getTotalUnpaidAmount(userId);
-                return new DashboardDataPack(latestUser, borrows, unpaidFines, totalFine);
+                return new DashboardDataPack(latestUser, allHistory, unpaidFines, totalFine);
             }
         };
 
@@ -246,23 +328,30 @@ public class UserDashboardView {
             if (pack.user != null) {
                 userName = pack.user.getName();
                 nameBadge.setText(userName + " 同學");
-                roleBadge.setText("身分: " + pack.user.getRoleLevel().name() + " | 狀態: " + pack.user.getStatus().name());
+                roleBadge.setText("身分: " + pack.user.getRoleLevel().name()
+                        + " | 狀態: " + pack.user.getStatus().name());
                 if (pack.user.getStatus() == UserStatus.SUSPENDED) {
                     roleBadge.setStyle("-fx-text-fill: #E74C3C; -fx-font-weight: bold;");
                 } else {
                     roleBadge.setStyle("-fx-text-fill: " + AppStyle.SUCCESS + ";");
                 }
             }
-            borrowRecordsData.setAll(pack.borrowRecords);
+            borrowHistoryData.setAll(pack.borrowRecords);
             finesData.setAll(pack.unpaidFines);
             totalFineLabel.setText("未繳總金額：NT$ " + pack.totalFineAmount);
-            borrowTable.setPlaceholder(new Label("目前無借閱中的書籍。"));
-            fineTable.setPlaceholder(new Label("太棒了！您目前沒有任何未繳罰款。"));
+            if (borrowTable != null) borrowTable.setPlaceholder(new Label("目前無任何借閱紀錄。"));
+            if (fineTable != null) fineTable.setPlaceholder(new Label("太棒了！您目前沒有任何未繳罰款。"));
         });
+
+        refreshTask.setOnFailed(e -> {
+            System.err.println("❌ 刷新使用者資料失敗：" + refreshTask.getException().getMessage());
+        });
+
         new Thread(refreshTask).start();
     }
 
     private void handleAsyncSearch(String keyword) {
+        if (searchTable == null) return;
         searchTable.setPlaceholder(new ProgressIndicator());
         Task<List<Book>> searchTask = new Task<>() {
             @Override
@@ -276,6 +365,7 @@ public class UserDashboardView {
         });
         new Thread(searchTask).start();
     }
+
     private void handleAsyncBorrow(int days) {
         Book selectedBook = searchTable.getSelectionModel().getSelectedItem();
         if (selectedBook == null) {
@@ -294,11 +384,8 @@ public class UserDashboardView {
             String result = borrowTask.getValue();
             if ("SUCCESS".equals(result)) {
                 showAlert("借閱成功", "✅ 已成功借閱《" + selectedBook.getTitle() + "》！");
-                // 同時刷新搜尋列表與個人資料，並強制重繪 Table
-                handleAsyncSearch("");
-                asyncRefreshUserData();
-                searchTable.refresh();
-                borrowTable.refresh();
+                handleAsyncSearch("");        // 刷新庫存狀態
+                asyncRefreshUserData();      // 刷新借閱歷史
             } else {
                 showAlert("借閱失敗", result);
             }
@@ -312,6 +399,11 @@ public class UserDashboardView {
             showAlert("操作提示", "請先從上方列表中選取您要歸還的書籍。");
             return;
         }
+        // 若已還書則不允許重複操作
+        if (selectedRecord.getReturnDate() != null) {
+            showAlert("操作提示", "此書籍已經歸還，無需重複操作。");
+            return;
+        }
 
         Task<String> returnTask = new Task<>() {
             @Override protected String call() throws Exception {
@@ -323,21 +415,19 @@ public class UserDashboardView {
             String result = returnTask.getValue();
             if (result.startsWith("SUCCESS_WITH_FINE")) {
                 String amount = result.split(":")[1];
-                showAlert("還書成功（逾期）", "⚠️ 歸還成功！由於該書已逾期，系統已自動開立 NT$ " + amount + " 罰單，您的帳號已被暫停借閱權限。");
+                showAlert("還書成功（逾期）",
+                        "⚠️ 歸還成功！由於該書已逾期，系統已自動開立 NT$ " + amount
+                                + " 罰單，您的帳號已被暫停借閱權限。");
             } else if ("SUCCESS".equals(result)) {
                 showAlert("還書成功", "✅ 書籍已順利歸還！感謝您的配合。");
             } else {
                 showAlert("還書失敗", result);
             }
-            // 確保還書後，搜尋清單庫存狀態更新
             handleAsyncSearch("");
             asyncRefreshUserData();
-            borrowTable.refresh();
-            searchTable.refresh();
         });
         new Thread(returnTask).start();
     }
-
 
     private void handleAsyncPayFine() {
         Fine selectedFine = fineTable.getSelectionModel().getSelectedItem();
@@ -355,9 +445,11 @@ public class UserDashboardView {
         payTask.setOnSucceeded(e -> {
             String result = payTask.getValue();
             if ("SUCCESS_AND_ACTIVATED".equals(result)) {
-                showAlert("繳費成功", "🎉 所有罰款皆已結清！您的借閱權限已自動復權，歡迎繼續借閱。");
+                showAlert("繳費成功",
+                        "🎉 所有罰款皆已結清！您的借閱權限已自動復權，歡迎繼續借閱。");
             } else if ("SUCCESS".equals(result)) {
-                showAlert("繳費成功", "✅ 該筆款項已收訖。由於您名下仍有其他未繳罰單，請全數結清以恢復權限。");
+                showAlert("繳費成功",
+                        "✅ 該筆款項已收訖。由於您名下仍有其他未繳罰單，請全數結清以恢復權限。");
             } else {
                 showAlert("繳費失敗", result);
             }
@@ -381,7 +473,8 @@ public class UserDashboardView {
         final List<Fine> unpaidFines;
         final int totalFineAmount;
 
-        DashboardDataPack(User user, List<BorrowRecord> borrowRecords, List<Fine> unpaidFines, int totalFineAmount) {
+        DashboardDataPack(User user, List<BorrowRecord> borrowRecords,
+                          List<Fine> unpaidFines, int totalFineAmount) {
             this.user = user;
             this.borrowRecords = borrowRecords;
             this.unpaidFines = unpaidFines;

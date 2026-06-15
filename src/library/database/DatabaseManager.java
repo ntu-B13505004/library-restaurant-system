@@ -70,21 +70,30 @@ public class DatabaseManager {
                     "FOREIGN KEY(record_id) REFERENCES borrow_records(record_id) ON DELETE CASCADE)");
             System.out.println("📊 SQLite 資料表完全依據專題簡報規格初始化/檢查完成。");
 
-            // 🚩 ✨ 新增：自動檢查並建置系統預設管理員（Data Seeding）
+// 🚩 ✨ 修正：自動檢查並建置系統預設管理員（Data Seeding）
+// 💡 只有在資料庫「已經有其他學生資料，但缺乏管理員」時才在這裡建立。
+// 如果是全新資料庫（連學生都沒有），就留給 DataLoader 統一匯入，避免 ID 鎖死在 10000。
+            String checkTotalUsers = "SELECT COUNT(*) FROM users";
             String checkAdminSql = "SELECT COUNT(*) FROM users WHERE role_level = 'ADMIN'";
-            try (ResultSet rs = stmt.executeQuery(checkAdminSql)) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    String insertAdminSql = "INSERT INTO users (student_no, name, password, role_level, status, created_at) VALUES (?, ?, ?, ?, ?, ?)";
-                    try (PreparedStatement pstmt = conn.prepareStatement(insertAdminSql)) {
-                        pstmt.setString(1, "ADMIN001"); // 管理員學號（登入帳號）
-                        pstmt.setString(2, "系統管理員");
-                        pstmt.setString(3, "admin123"); // 預設密碼
-                        pstmt.setString(4, library.model.UserRole.ADMIN.name());   // "ADMIN"
-                        pstmt.setString(5, library.model.UserStatus.ACTIVE.name()); // "ACTIVE"
-                        pstmt.setString(6, java.time.LocalDateTime.now().toString());
+            try (Statement checkStmt = conn.createStatement();
+                 ResultSet rsTotal = checkStmt.executeQuery(checkTotalUsers);
+                 ResultSet rsAdmin = checkStmt.executeQuery(checkAdminSql)) {
 
+                int totalUsers = rsTotal.next() ? rsTotal.getInt(1) : 0;
+                int adminCount = rsAdmin.next() ? rsAdmin.getInt(1) : 0;
+
+                if (totalUsers > 0 && adminCount == 0) {
+                    String insertAdminSql = "INSERT INTO users (user_id, student_no, name, password, role_level, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                    try (PreparedStatement pstmt = conn.prepareStatement(insertAdminSql)) {
+                        pstmt.setInt(1, 9999);
+                        pstmt.setString(2, "ADMIN001");
+                        pstmt.setString(3, "系統管理員");
+                        pstmt.setString(4, "admin123");
+                        pstmt.setString(5, library.model.UserRole.ADMIN.name());
+                        pstmt.setString(6, library.model.UserStatus.ACTIVE.name());
+                        pstmt.setString(7, java.time.LocalDateTime.now().toString());
                         pstmt.executeUpdate();
-                        System.out.println("🚩 系統成功自動內建管理員帳號：[ ADMIN001 ]，密碼：[ admin123 ]");
+                        System.out.println("🚩 系統成功補建管理員帳號：[ ADMIN001 ] (ID: 9999)");
                     }
                 }
             }

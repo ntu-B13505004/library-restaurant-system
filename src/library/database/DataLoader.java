@@ -96,6 +96,21 @@ public class DataLoader {
                     pstmt.addBatch();
                 }
                 pstmt.executeBatch();
+
+                // 🎯 核心優化：在所有 JSON 讀者成功拿到 ID (1, 2, 3...) 之後，再把管理員塞到 ID 9999
+                // 這樣既能讓借閱紀錄完美配對，又不會讓 SQLite 的 AUTOINCREMENT 計數器提早跳到 10000！
+                String insertAdminSql = "INSERT INTO users (user_id, student_no, name, password, role_level, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement adminPstmt = conn.prepareStatement(insertAdminSql)) {
+                    adminPstmt.setInt(1, 9999);
+                    adminPstmt.setString(2, "ADMIN001");
+                    adminPstmt.setString(3, "系統管理員");
+                    adminPstmt.setString(4, "admin123");
+                    adminPstmt.setString(5, "ADMIN");
+                    adminPstmt.setString(6, "ACTIVE");
+                    adminPstmt.setString(7, LocalDateTime.now().format(formatter));
+                    adminPstmt.executeUpdate();
+                    System.out.println("🚩 隨初始資料一同建立管理員帳號：[ ADMIN001 ] (ID: 9999)");
+                }
             }
         }
     }

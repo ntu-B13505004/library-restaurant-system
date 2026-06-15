@@ -1,0 +1,4 @@
+ReportService — 建構子需要傳入 OrderService，所以 Main.java 初始要：
+
+OrderService orderService   = new OrderService();
+ReportService reportService = new ReportService(orderService); // 把 orderService 傳進去

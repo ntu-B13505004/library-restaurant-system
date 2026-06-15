@@ -66,6 +66,6 @@
    - [UserDashboardView.java](gui/UserDashboardView.java)
 
 ### problem 
-    罰金機制有問題，應更改成過期就開始有罰金
-    User介面借還書不會更新
-    Admin新增功能
+    罰金機制有問題，應更改成過期就開始有罰金(fix)
+    User介面借還書不會更新(fix)
+    Admin新增功能->升級管理員(give up;介面問題)

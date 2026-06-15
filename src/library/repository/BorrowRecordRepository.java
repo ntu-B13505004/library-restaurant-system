@@ -313,5 +313,28 @@ public class BorrowRecordRepository {
 
         return null;
     }
+    // ===================================================================
+// 📌 在 BorrowRecordRepository.java 的末尾（最後一個 } 之前）補上這個方法
+// ===================================================================
+
+    /**
+     * ✨ 新增：查詢全館所有「尚未歸還」的借閱紀錄
+     * 供 FineService.getAllUnpaidFines() 掃描全館逾期使用
+     */
+    public static List<BorrowRecord> findAllActive() {
+        List<BorrowRecord> records = new ArrayList<>();
+        String sql = "SELECT * FROM borrow_records WHERE return_date IS NULL";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                records.add(mapResultSetToRecord(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return records;
+    }
 
 }

@@ -22,11 +22,14 @@ public class FineService {
 
     /**
      * ✨ 核心功能 1：為逾期紀錄建立/更新罰單
+     * 💡 逾期即開罰：只要 now() > dueDate，不需等到還書
      */
     public Fine createOrUpdateFine(BorrowRecord record) {
-        if (record == null || !record.isOverdue()) {
-            return null;
-        }
+        if (record == null) return null;
+
+        // 動態判斷是否逾期（不依賴 isOverdue 旗標，直接比時間）
+        record.checkOverdue();
+        if (!record.isOverdue()) return null;
 
         try {
             Fine existingFine = fineRepository.findByRecordId(record.getRecordId());
@@ -36,14 +39,13 @@ public class FineService {
                 Fine newFine = new Fine(0, record);
                 fineRepository.saveOrUpdate(newFine);
 
-                // 💡 聯動停權：將該學生狀態改為 SUSPENDED
+                // 聯動停權：將該學生狀態改為 SUSPENDED
                 userRepository.updateUserStatus(record.getUser().getUserId(), UserStatus.SUSPENDED);
                 return newFine;
             } else {
-                // 已存在且未付：動態更新最新罰金（根據天數累積）寫入資料庫
+                // 已存在且未付：累積罰金，更新 DB 金額快照
                 if (!existingFine.isPaid()) {
-                    existingFine.getAmount(); // 觸發 Model 內部更新金額
-                    fineRepository.saveOrUpdate(existingFine);
+                    fineRepository.saveOrUpdate(existingFine); // getAmount() 在 saveOrUpdate 內會動態取最新值
                 }
                 return existingFine;
             }
@@ -68,16 +70,15 @@ public class FineService {
                 return "⚠️ 提示：此筆罰款先前已繳清，請勿重複繳納。";
             }
 
-            // 1. 執行繳款
+            // 執行繳款（金額鎖定為繳款當下的累積值）
             fine.pay();
             fineRepository.saveOrUpdate(fine);
 
-            // 2. 💡 自動復權稽核：檢查該學生是否已還清所有未繳罰款？
+            // 自動復權稽核：確認是否已無其他未繳罰款
             int userId = fine.getRecord().getUser().getUserId();
             int remainingUnpaid = fineRepository.countUnpaidFinesByUserId(userId);
 
             if (remainingUnpaid == 0) {
-                // 債務全部清空，自動將學生改回 ACTIVE 狀態，使其恢復借書權利！
                 userRepository.updateUserStatus(userId, UserStatus.ACTIVE);
                 return "SUCCESS_AND_ACTIVATED";
             }
@@ -89,23 +90,34 @@ public class FineService {
         }
     }
 
-    // 在 FineService.java 中的獲取罰款方法 (概念示意)
+    /**
+     * ✨ 查詢功能 3：取得特定學生所有未繳罰款
+     * 💡 逾期即開罰：掃描所有「尚未還書且已過期」的紀錄，確保罰單存在於 DB
+     */
     public List<Fine> getUnpaidFinesByUser(int userId) {
-        // 1. 先抓出這個學生所有「尚未歸還」的借閱紀錄
+        // 1. 掃描這個學生所有「尚未歸還」的借閱紀錄
         List<BorrowRecord> activeRecords = BorrowRecordRepository.findActiveByUserId(userId);
 
-        // 2. 巡覽這些紀錄，只要發現現在時間已經超過 dueDate，就確保它在 fines 表裡有資料
         for (BorrowRecord record : activeRecords) {
+            // 只要現在時間已超過 dueDate，就確保罰單存在並更新金額
             if (LocalDateTime.now().isAfter(record.getDueDate())) {
-                // 如果是過期的，建立一個未繳清的 Fine 物件並存進資料庫 (這會觸發你的 saveOrUpdate)
-                Fine newOrUpdatedFine = new Fine(0, record);
-                fineRepository.saveOrUpdate(newOrUpdatedFine);
+                Fine existingFine = fineRepository.findByRecordId(record.getRecordId());
+                if (existingFine == null) {
+                    // 首次逾期：建立罰單 + 停權
+                    Fine newFine = new Fine(0, record);
+                    fineRepository.saveOrUpdate(newFine);
+                    userRepository.updateUserStatus(userId, UserStatus.SUSPENDED);
+                } else if (!existingFine.isPaid()) {
+                    // 已有罰單未繳清：更新累積金額快照到 DB
+                    fineRepository.saveOrUpdate(existingFine);
+                }
             }
         }
 
-        // 3. 檢查完畢後，這時資料庫裡該有的罰單都有了，再呼叫原本的查詢
+        // 2. 重新從 DB 撈取最新未繳罰單列表回傳
         return fineRepository.findUnpaidByUserId(userId);
     }
+
     /**
      * ✨ 查詢功能 4：計算特定學生目前的累積未繳總金額
      */
@@ -119,11 +131,24 @@ public class FineService {
     }
 
     /**
-     * ✨ 管理者功能 5：全校未繳罰款清單
+     * ✨ 管理者功能 5：全館未繳罰款清單
+     * 💡 同樣觸發「逾期即開罰」掃描，確保資料完整
      */
     public List<Fine> getAllUnpaidFines() {
-        List<Fine> allUnpaid = fineRepository.findAllUnpaid();
-        for(Fine f : allUnpaid) { f.getAmount(); }
-        return allUnpaid;
+        // 掃描全館所有未還書的逾期紀錄，補建罰單
+        List<BorrowRecord> allActiveRecords = BorrowRecordRepository.findAllActive();
+        for (BorrowRecord record : allActiveRecords) {
+            if (LocalDateTime.now().isAfter(record.getDueDate())) {
+                Fine existingFine = fineRepository.findByRecordId(record.getRecordId());
+                if (existingFine == null) {
+                    Fine newFine = new Fine(0, record);
+                    fineRepository.saveOrUpdate(newFine);
+                    userRepository.updateUserStatus(record.getUser().getUserId(), UserStatus.SUSPENDED);
+                } else if (!existingFine.isPaid()) {
+                    fineRepository.saveOrUpdate(existingFine);
+                }
+            }
+        }
+        return fineRepository.findAllUnpaid();
     }
 }
