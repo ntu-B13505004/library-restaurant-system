@@ -33,7 +33,6 @@ public class MenuItem {
     public void setPrice(int price)          { this.price = price; }
     public void setSoldOut(boolean soldOut)  { this.isSoldOut = soldOut; }
     //不確定要不要加可改名字
-
     
 
     @Override
