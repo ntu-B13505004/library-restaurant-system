@@ -44,12 +44,12 @@
      - payFine ***[Y]***
      - getUnpaidFinesByUser 
      - getTotalUnpaidAmount 
-     - getAllUnpaidFines
+     - getAllUnpaidFines ***[Y]***
    - [ReportService.java](service/ReportService.java)
-     - getBookSubjectPopularity
-     - getTop5BorrowedBooks
-     - getLibraryFineSummary
-     - getLibraryGeneralKPIs
+     - getBookSubjectPopularity ***[Y]***
+     - getTop5BorrowedBooks ***[Y]***
+     - getLibraryFineSummary 
+     - getLibraryGeneralKPIs ***[Y]***
    - [UserService.java](service/UserService.java)
      - login ***[Y]***
      - registerUser ***[Y]***

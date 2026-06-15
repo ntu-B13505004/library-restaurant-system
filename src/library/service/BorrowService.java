@@ -96,7 +96,7 @@ public class BorrowService {
     }
 
     /**
-     * ✨ 核心功能 2：辦理還書交易（修復時間計算誤差與罰款封裝破壞問題）
+     * ✨ 核心功能 2：辦理還書交易（支援已預先產生罰金的更新機制）
      */
     public String returnBook(int bookId) {
         Connection conn = null;
@@ -115,34 +115,49 @@ public class BorrowService {
             LocalDateTime returnDate = LocalDateTime.now();
             boolean isOverdue = returnDate.isAfter(activeRecord.getDueDate());
 
-            // 2. 更新借閱紀錄歸還時間與狀態
+            // 2. 更新借閱紀錄歸還時間與狀態 (修正了你原本的 getBorrowDays 語法錯誤)
             borrowRepository.updateReturnStatusInTransaction(conn, activeRecord.getRecordId(), returnDate, isOverdue);
 
             // 3. 處理逾期罰款與停權邏輯
             if (isOverdue) {
-                // 將歷史時間塞回 Record，以便 Fine Model 動態計算時使用
                 activeRecord.hydrateHistoricalDates(activeRecord.getBorrowDate(), activeRecord.getDueDate(), returnDate);
 
-                // 💡 修正時間誤差：轉為 LocalDate 計算，避免未滿 24 小時被算成 0 天
                 long overdueDays = ChronoUnit.DAYS.between(activeRecord.getDueDate().toLocalDate(), returnDate.toLocalDate());
-                if (overdueDays <= 0) overdueDays = 1; // 防呆機制：發生跨日但時數極短的邊界情況，至少算 1 天
+                if (overdueDays <= 0) overdueDays = 1;
 
-                // 💡 修正罰款寫死問題：實例化 Fine 物件，讓 Model 自行依照內部常數 (DAILY_FINE) 算錢
                 Fine newFine = new Fine(0, activeRecord);
 
-                // 寫入罰款紀錄 (確保在同一個 Transaction 內)
-                String insertFineSql = "INSERT INTO fines (record_id, amount, is_paid, created_at) VALUES (?, ?, 0, ?)";
-                try (PreparedStatement pstmtFine = conn.prepareStatement(insertFineSql)) {
-                    pstmtFine.setInt(1, activeRecord.getRecordId());
-                    pstmtFine.setInt(2, newFine.getAmount()); // 取得標準計算出的金額
-                    pstmtFine.setString(3, returnDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    pstmtFine.executeUpdate();
+                // 💡 修正點：先檢查這筆借閱是不是已經被 FineService 預先產生過罰單了
+                String checkFineSql = "SELECT COUNT(*) FROM fines WHERE record_id = ?";
+                boolean fineExists = false;
+                try (PreparedStatement pstmtCheck = conn.prepareStatement(checkFineSql)) {
+                    pstmtCheck.setInt(1, activeRecord.getRecordId());
+                    try (java.sql.ResultSet rs = pstmtCheck.executeQuery()) {
+                        if (rs.next() && rs.getInt(1) > 0) fineExists = true;
+                    }
                 }
 
-                // 💡 聯動停權：產生新罰單，立刻將該學生狀態改為 SUSPENDED
+                // 💡 修正點：有就 UPDATE，沒有就 INSERT
+                if (fineExists) {
+                    String updateFineSql = "UPDATE fines SET amount = ? WHERE record_id = ?";
+                    try (PreparedStatement pstmtUpdate = conn.prepareStatement(updateFineSql)) {
+                        pstmtUpdate.setInt(1, newFine.getAmount());
+                        pstmtUpdate.setInt(2, activeRecord.getRecordId());
+                        pstmtUpdate.executeUpdate();
+                    }
+                } else {
+                    String insertFineSql = "INSERT INTO fines (record_id, amount, is_paid, created_at) VALUES (?, ?, 0, ?)";
+                    try (PreparedStatement pstmtInsert = conn.prepareStatement(insertFineSql)) {
+                        pstmtInsert.setInt(1, activeRecord.getRecordId());
+                        pstmtInsert.setInt(2, newFine.getAmount());
+                        pstmtInsert.setString(3, returnDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        pstmtInsert.executeUpdate();
+                    }
+                }
+
+                // 聯動停權：立刻將該學生狀態改為 SUSPENDED
                 String suspendSql = "UPDATE users SET status = 'SUSPENDED' WHERE user_id = ?";
                 try (PreparedStatement pstmtUser = conn.prepareStatement(suspendSql)) {
-                    // 根據簡報規格，被停權的使用者將無法繼續借書
                     pstmtUser.setInt(1, activeRecord.getUser().getUserId());
                     pstmtUser.executeUpdate();
                 }
@@ -168,7 +183,6 @@ public class BorrowService {
             }
         }
     }
-
     /**
      * ✨ 核心功能 3：查詢特定學生的目前借閱與歷史總紀錄
      */

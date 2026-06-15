@@ -34,17 +34,28 @@ public class Fine {
     /**
      * ✨ 動態計算最新應繳金額
      */
+    /**
+     * ✨ 動態計算最新應繳金額 (已修正時間與狀態判斷)
+     */
     public int calculateCurrentAmount() {
-        if (record == null || !record.isOverdue()) return 0;
+        if (record == null || record.getDueDate() == null) return 0;
 
-        // 如果書已經還了，就計算到「歸還當天」；如果還沒還，就動態計算到「此時此刻」
+        // 1. 決定結算終點：如果已還書，算到歸還日；如果未還，算到今天
         LocalDateTime endPoint = (record.getReturnDate() != null)
                 ? record.getReturnDate()
                 : LocalDateTime.now();
 
-        long overdueDays = ChronoUnit.DAYS.between(record.getDueDate(), endPoint);
+        // 2. 判斷是否過期 (捨棄依賴 isOverdue 旗標，直接比對時間)
+        if (endPoint.isBefore(record.getDueDate()) || endPoint.isEqual(record.getDueDate())) {
+            return 0; // 沒過期，罰金 0
+        }
 
-        // 確保不會出現負數天數
+        // 3. 為了避免未滿 24 小時算 0 天，我們將時間切換為 LocalDate (純日期) 來算天數差
+        long overdueDays = ChronoUnit.DAYS.between(
+                record.getDueDate().toLocalDate(),
+                endPoint.toLocalDate()
+        );
+
         return overdueDays > 0 ? (int) overdueDays * DAILY_FINE : 0;
     }
 

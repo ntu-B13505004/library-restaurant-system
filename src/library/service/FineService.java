@@ -3,9 +3,11 @@ package library.service;
 import library.model.BorrowRecord;
 import library.model.Fine;
 import library.model.UserStatus;
+import library.repository.BorrowRecordRepository;
 import library.repository.FineRepository;
 import library.repository.UserRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class FineService {
@@ -87,17 +89,23 @@ public class FineService {
         }
     }
 
-    /**
-     * ✨ 查詢功能 3：獲取特定學生目前「所有未繳清」的罰單清單
-     */
+    // 在 FineService.java 中的獲取罰款方法 (概念示意)
     public List<Fine> getUnpaidFinesByUser(int userId) {
-        List<Fine> unpaidList = fineRepository.findUnpaidByUserId(userId);
-        for (Fine fine : unpaidList) {
-            fine.getAmount(); // 確保畫面上反映最新累積罰金
-        }
-        return unpaidList;
-    }
+        // 1. 先抓出這個學生所有「尚未歸還」的借閱紀錄
+        List<BorrowRecord> activeRecords = BorrowRecordRepository.findActiveByUserId(userId);
 
+        // 2. 巡覽這些紀錄，只要發現現在時間已經超過 dueDate，就確保它在 fines 表裡有資料
+        for (BorrowRecord record : activeRecords) {
+            if (LocalDateTime.now().isAfter(record.getDueDate())) {
+                // 如果是過期的，建立一個未繳清的 Fine 物件並存進資料庫 (這會觸發你的 saveOrUpdate)
+                Fine newOrUpdatedFine = new Fine(0, record);
+                fineRepository.saveOrUpdate(newOrUpdatedFine);
+            }
+        }
+
+        // 3. 檢查完畢後，這時資料庫裡該有的罰單都有了，再呼叫原本的查詢
+        return fineRepository.findUnpaidByUserId(userId);
+    }
     /**
      * ✨ 查詢功能 4：計算特定學生目前的累積未繳總金額
      */

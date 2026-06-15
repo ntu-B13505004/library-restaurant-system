@@ -276,7 +276,6 @@ public class UserDashboardView {
         });
         new Thread(searchTask).start();
     }
-
     private void handleAsyncBorrow(int days) {
         Book selectedBook = searchTable.getSelectionModel().getSelectedItem();
         if (selectedBook == null) {
@@ -295,8 +294,11 @@ public class UserDashboardView {
             String result = borrowTask.getValue();
             if ("SUCCESS".equals(result)) {
                 showAlert("借閱成功", "✅ 已成功借閱《" + selectedBook.getTitle() + "》！");
-                handleAsyncSearch(""); // 刷新搜尋列表狀態
-                asyncRefreshUserData(); // 更新個人借閱清單
+                // 同時刷新搜尋列表與個人資料，並強制重繪 Table
+                handleAsyncSearch("");
+                asyncRefreshUserData();
+                searchTable.refresh();
+                borrowTable.refresh();
             } else {
                 showAlert("借閱失敗", result);
             }
@@ -327,10 +329,15 @@ public class UserDashboardView {
             } else {
                 showAlert("還書失敗", result);
             }
+            // 確保還書後，搜尋清單庫存狀態更新
+            handleAsyncSearch("");
             asyncRefreshUserData();
+            borrowTable.refresh();
+            searchTable.refresh();
         });
         new Thread(returnTask).start();
     }
+
 
     private void handleAsyncPayFine() {
         Fine selectedFine = fineTable.getSelectionModel().getSelectedItem();

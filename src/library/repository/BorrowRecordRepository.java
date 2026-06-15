@@ -13,8 +13,8 @@ import java.util.List;
 
 public class BorrowRecordRepository {
 
-    private final UserRepository userRepository = new UserRepository();
-    private final BookRepository bookRepository = new BookRepository();
+    private static final UserRepository userRepository = new UserRepository();
+    private static final BookRepository bookRepository = new BookRepository();
 
     private static final DateTimeFormatter SQLITE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -193,7 +193,7 @@ public class BorrowRecordRepository {
     /**
      * 🛠️ 輔助方法：將資料庫欄位，拼裝轉換回強型別的物件組合
      */
-    private BorrowRecord mapResultSetToRecord(ResultSet rs) throws SQLException {
+    private static BorrowRecord mapResultSetToRecord(ResultSet rs) throws SQLException {
         int recordId = rs.getInt("record_id");
         int userId = rs.getInt("user_id");
         int bookId = rs.getInt("book_id");
@@ -217,7 +217,7 @@ public class BorrowRecordRepository {
         return record;
     }
 
-    public List<BorrowRecord> findActiveByUserId(int userId) {
+    public static List<BorrowRecord> findActiveByUserId(int userId) {
 
         List<BorrowRecord> records =
                 new ArrayList<>();
@@ -261,7 +261,7 @@ public class BorrowRecordRepository {
     /**
      * 🛠️ 輔助方法：安全地將資料庫時間字串轉為 Java LocalDateTime
      */
-    private LocalDateTime parseSqliteDateTime(String dateStr) {
+    private static LocalDateTime parseSqliteDateTime(String dateStr) {
         if (dateStr == null || dateStr.trim().isEmpty()) {
             return null;
         }
