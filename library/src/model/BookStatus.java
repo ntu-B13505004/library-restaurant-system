@@ -1,4 +1,4 @@
-package library.model;
+package library.src.model;
 
 public enum BookStatus {
     AVAILABLE,    // 可借閱

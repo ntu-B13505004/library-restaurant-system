@@ -1,9 +1,9 @@
-package library.repository;
+package library.src.repository;
 
-import library.database.DatabaseManager;
-import library.model.Book;
-import library.model.BookStatus;
-import library.model.BorrowRecord;
+import library.src.database.DatabaseManager;
+import library.src.model.Book;
+import library.src.model.BookStatus;
+import library.src.model.BorrowRecord;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -103,7 +103,7 @@ public class BookRepository {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ 根據 ID 查詢書籍失敗: " + bookId);
+            System.err.println("❌根據ID查詢書籍失敗: " + bookId);
             e.printStackTrace();
         }
         return null;
@@ -161,7 +161,7 @@ public class BookRepository {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ 關鍵字搜尋書籍失敗，關鍵字: " + keyword);
+            System.err.println("❌關鍵字搜尋書籍失敗，關鍵字: " + keyword);
             e.printStackTrace();
         }
         return new ArrayList<>(bookMap.values());
@@ -181,7 +181,7 @@ public class BookRepository {
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
-            System.err.println("❌ 更新書籍狀態失敗");
+            System.err.println("❌更新書籍狀態失敗");
             e.printStackTrace();
         }
     }
@@ -200,7 +200,7 @@ public class BookRepository {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("⚠️ 查詢書籍 ISBN 失敗，Book ID: " + bookId);
+            System.err.println("⚠️查詢書籍 ISBN 失敗，Book ID: " + bookId);
         }
         return isbns;
     }
@@ -302,6 +302,68 @@ public class BookRepository {
                 if (affected == 0) {
                     conn.rollback();
                     return false;
+                }
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
+        }
+    }
+    /**
+     * ✨ 管理者功能：更新書籍資訊（包含同步更新 ISBN 列表）
+     */
+    public boolean update(Book book) {
+        String updateBookSql = "UPDATE books SET title = ?, authors = ?, subjects = ?, publisher = ?, publish_year = ?, edition = ?, format_desc = ?, source = ?, note = ? WHERE book_id = ?";
+        String deleteIsbnsSql = "DELETE FROM book_isbns WHERE book_id = ?";
+        String insertIsbnSql = "INSERT INTO book_isbns (book_id, isbn) VALUES (?, ?)";
+
+        Connection conn = null;
+        try {
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false); // 開啟交易
+
+            // 1. 更新書籍主表資訊
+            try (PreparedStatement pstmt = conn.prepareStatement(updateBookSql)) {
+                pstmt.setString(1, book.getTitle());
+                pstmt.setString(2, book.getAuthors());
+                pstmt.setString(3, book.getSubjects());
+                pstmt.setString(4, book.getPublisher());
+                pstmt.setString(5, book.getPublishYear());
+                pstmt.setString(6, book.getEdition());
+                pstmt.setString(7, book.getFormatDesc());
+                pstmt.setString(8, book.getSource());
+                pstmt.setString(9, book.getNote());
+                pstmt.setInt(10, book.getBookId());
+                pstmt.executeUpdate();
+            }
+
+            // 2. 清除舊的 ISBN 紀錄
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteIsbnsSql)) {
+                pstmt.setInt(1, book.getBookId());
+                pstmt.executeUpdate();
+            }
+
+            // 3. 重新寫入新的 ISBN 列表
+            if (book.getIsbns() != null && !book.getIsbns().isEmpty()) {
+                try (PreparedStatement pstmtIsbn = conn.prepareStatement(insertIsbnSql)) {
+                    for (String isbn : book.getIsbns()) {
+                        if (isbn != null && !isbn.trim().isEmpty()) {
+                            pstmtIsbn.setInt(1, book.getBookId());
+                            pstmtIsbn.setString(2, isbn.trim());
+                            pstmtIsbn.addBatch();
+                        }
+                    }
+                    pstmtIsbn.executeBatch();
                 }
             }
 

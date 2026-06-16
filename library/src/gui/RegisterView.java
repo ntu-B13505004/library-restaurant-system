@@ -1,4 +1,4 @@
-package library.gui;
+package library.src.gui;
 
 import javafx.concurrent.Task;
 import javafx.geometry.*;
@@ -7,7 +7,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
-import library.service.UserService;
+import library.src.service.UserService;
 
 public class RegisterView {
     private final Stage stage;

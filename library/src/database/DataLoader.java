@@ -1,6 +1,5 @@
-package library.database;
+package library.src.database;
 
-import library.model.BookStatus;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.FileReader;
@@ -63,7 +62,7 @@ public class DataLoader {
 
     private static void importUsers(Connection conn) throws Exception {
         Gson gson = new Gson();
-        try (FileReader reader = new FileReader("Users.json")) {
+        try (FileReader reader = new FileReader("src/Users.json")) {
             Type listType = new TypeToken<List<Map<String, Object>>>(){}.getType();
             List<Map<String, Object>> users = gson.fromJson(reader, listType);
 
@@ -116,7 +115,7 @@ public class DataLoader {
     }
     private static void importBooks(Connection conn) throws Exception {
         Gson gson = new Gson();
-        try (FileReader reader = new FileReader("Books.json")) {
+        try (FileReader reader = new FileReader("src/Books.json")) {
             Type listType = new TypeToken<List<Map<String, Object>>>(){}.getType();
             List<Map<String, Object>> books = gson.fromJson(reader, listType);
 
@@ -198,7 +197,7 @@ public class DataLoader {
 
     private static void importBorrowRecords(Connection conn) throws Exception {
         Gson gson = new Gson();
-        try (FileReader reader = new FileReader("Borrow_records.json")) {
+        try (FileReader reader = new FileReader("src/Borrow_records.json")) {
             Type listType = new TypeToken<List<Map<String, Object>>>(){}.getType();
             List<Map<String, Object>> records = gson.fromJson(reader, listType);
 

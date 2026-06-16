@@ -1,4 +1,4 @@
-package library.model;
+package library.src.model;
 
 public enum UserRole {
     NORMAL,   // 讀者

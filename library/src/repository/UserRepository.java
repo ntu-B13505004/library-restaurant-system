@@ -1,9 +1,9 @@
-package library.repository;
+package library.src.repository;
 
-import library.database.DatabaseManager;
-import library.model.User;
-import library.model.UserRole;
-import library.model.UserStatus;
+import library.src.database.DatabaseManager;
+import library.src.model.User;
+import library.src.model.UserRole;
+import library.src.model.UserStatus;
 
 import java.sql.*;
 import java.util.ArrayList;

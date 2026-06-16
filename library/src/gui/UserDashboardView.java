@@ -1,4 +1,4 @@
-package library.gui;
+package library.src.gui;
 
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -13,8 +13,8 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
-import library.model.*;
-import library.service.*;
+import library.src.model.*;
+import library.src.service.*;
 
 import java.util.List;
 import java.util.Map;
@@ -45,6 +45,9 @@ public class UserDashboardView {
     private TableView<Fine> fineTable;
     private TableView<Book> searchTable;
     private Label totalFineLabel;
+
+    // 控制到期提醒彈窗只在初次載入或手動切換時觸發一次，避免頻繁打擾
+    private boolean hasShownDueReminder = false;
 
     public UserDashboardView(Stage stage, Map<String, Object> session) {
         this.stage = stage;
@@ -104,7 +107,7 @@ public class UserDashboardView {
 
         Scene scene = new Scene(mainLayout, 1000, 650);
         stage.setScene(scene);
-        stage.setTitle("智慧圖書館 - 學生個人主頁");
+        stage.setTitle("圖書館-學生個人主頁");
         stage.show();
     }
 
@@ -175,7 +178,18 @@ public class UserDashboardView {
             }
         });
 
-        borrowTable.getColumns().addAll(titleCol, dateCol, dueCol, returnStatusCol);
+        // ✨ 功能新增：顯示實際還書時間欄位 (去除秒與毫秒，保留至分鐘 YYYY-MM-DD HH:MM)
+        TableColumn<BorrowRecord, String> returnDateCol = new TableColumn<>("實際歸還時間");
+        returnDateCol.setCellValueFactory(cell -> {
+            java.time.LocalDateTime rDate = cell.getValue().getReturnDate();
+            if (rDate != null) {
+                return new SimpleStringProperty(rDate.toString().replace("T", " ").substring(0, 16));
+            }
+            return new SimpleStringProperty("-");
+        });
+        returnDateCol.setMaxWidth(200);
+
+        borrowTable.getColumns().addAll(titleCol, dateCol, dueCol, returnStatusCol, returnDateCol);
 
         // 還書按鈕（只對未還書有效）
         Button returnBtn = new Button("↩️ 辦理選定書籍還書");
@@ -210,7 +224,7 @@ public class UserDashboardView {
         TableColumn<Fine, String> fAmountCol = new TableColumn<>("累積罰金 (TWD)");
         fAmountCol.setCellValueFactory(cell ->
                 new SimpleStringProperty("$ " + cell.getValue().getAmount()));
-        fAmountCol.setMaxWidth(130);
+        fAmountCol.setMaxWidth(150);
 
         fineTable.getColumns().addAll(fBookCol, fDaysCol, fAmountCol);
 
@@ -285,7 +299,7 @@ public class UserDashboardView {
 
         Label daysLabel = new Label("借閱天數：");
         ComboBox<Integer> daysCombo = new ComboBox<>();
-        daysCombo.getItems().addAll(7, 14);
+        daysCombo.getItems().addAll(1,3,7,14);
         daysCombo.setValue(7);
         daysCombo.setStyle(AppStyle.textField());
 
@@ -293,7 +307,12 @@ public class UserDashboardView {
         borrowBtn.setStyle(AppStyle.buttonPrimary());
         borrowBtn.setOnAction(e -> handleAsyncBorrow(daysCombo.getValue()));
 
-        borrowBox.getChildren().addAll(daysLabel, daysCombo, borrowBtn);
+        // ✨ 功能新增：查看該書籍近期借還歷史紀錄按鈕
+        Button historyBtn = new Button("🔍 查看書籍歷史");
+        historyBtn.setStyle(AppStyle.buttonSecondary());
+        historyBtn.setOnAction(e -> handleAsyncBookHistory());
+
+        borrowBox.getChildren().addAll(daysLabel, daysCombo, borrowBtn, historyBtn);
         box.getChildren().addAll(title, searchBox, searchTable, borrowBox);
         return box;
     }
@@ -341,6 +360,32 @@ public class UserDashboardView {
             totalFineLabel.setText("未繳總金額：NT$ " + pack.totalFineAmount);
             if (borrowTable != null) borrowTable.setPlaceholder(new Label("目前無任何借閱紀錄。"));
             if (fineTable != null) fineTable.setPlaceholder(new Label("太棒了！您目前沒有任何未繳罰款。"));
+
+            // ✨ 功能新增：借閱到期溫馨提醒機制（自動掃描 3 天內即將到期的未歸還書籍）
+            if (!hasShownDueReminder) {
+                StringBuilder reminderMsg = new StringBuilder();
+                int imminentCount = 0;
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+                for (BorrowRecord record : pack.borrowRecords) {
+                    if (record.getReturnDate() == null) { // 篩選借閱中的書籍
+                        long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(
+                                now.toLocalDate(), record.getDueDate().toLocalDate());
+                        // 距離到期 0 至 3 天者納入主動提示範圍
+                        if (daysLeft >= 0 && daysLeft <= 3) {
+                            imminentCount++;
+                            reminderMsg.append(String.format("•《%s》將於 %d 天後到期\n（應還日期：%s）\n",
+                                    record.getBook().getTitle(), daysLeft, record.getDueDate().toString().substring(0,10)));
+                        }
+                    }
+                }
+
+                if (imminentCount > 0) {
+                    hasShownDueReminder = true; // 鎖定旗標，避免使用者每次手動點擊「刷新」都重覆跳窗打擾
+                    showAlert("⏰ 借閱即將到期溫馨提醒",
+                            "您目前有 " + imminentCount + " 本書籍即將到期，請留意還書時間以免逾期：\n\n" + reminderMsg.toString());
+                }
+            }
         });
 
         refreshTask.setOnFailed(e -> {
@@ -391,6 +436,82 @@ public class UserDashboardView {
             }
         });
         new Thread(borrowTask).start();
+    }
+
+    // ✨ 功能新增：非同步獲取該書籍的流通借還歷史紀錄
+    private void handleAsyncBookHistory() {
+        Book selectedBook = searchTable.getSelectionModel().getSelectedItem();
+        if (selectedBook == null) {
+            showAlert("提示", "請先從列表中選取要查看歷史的書籍。");
+            return;
+        }
+
+        Task<List<BorrowRecord>> historyTask = new Task<>() {
+            @Override
+            protected List<BorrowRecord> call() throws Exception {
+                return borrowService.getBookBorrowHistory(selectedBook.getBookId());
+            }
+        };
+
+        historyTask.setOnSucceeded(e -> {
+            List<BorrowRecord> history = historyTask.getValue();
+            showBookHistoryDialog(selectedBook.getTitle(), history);
+        });
+
+        historyTask.setOnFailed(e -> {
+            showAlert("系統異常", "無法載入該書籍的歷史流通紀錄。");
+        });
+
+        new Thread(historyTask).start();
+    }
+
+    // ✨ 功能新增：以 Dialog 彈出視窗漂亮展示單本書歷史，並對其他學生姓名做隱私去識別化遮罩
+    private void showBookHistoryDialog(String bookTitle, List<BorrowRecord> history) {
+        Platform.runLater(() -> {
+            Dialog<Void> dialog = new Dialog<>();
+            dialog.setTitle("書籍近期借還紀錄");
+            dialog.setHeaderText("書籍：《" + bookTitle + "》的歷史流通流通軌跡");
+
+            ButtonType closeButtonType = new ButtonType("關閉", ButtonBar.ButtonData.CANCEL_CLOSE);
+            dialog.getDialogPane().getButtonTypes().add(closeButtonType);
+
+            TableView<BorrowRecord> hTable = new TableView<>(FXCollections.observableArrayList(history));
+            hTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+            hTable.setPrefSize(520, 280);
+
+            // 1. 借閱人欄位（資訊去識別化處理：如 '王大明' -> '王*明', '李小美' -> '李*美'）
+            TableColumn<BorrowRecord, String> userCol = new TableColumn<>("借閱人");
+            userCol.setCellValueFactory(c -> {
+                User u = c.getValue().getUser();
+                if (u != null) {
+                    String name = u.getName();
+                    if (name != null && name.length() > 1) {
+                        return new SimpleStringProperty(name.charAt(0) + "*" + (name.length() > 2 ? name.substring(2) : ""));
+                    }
+                    return new SimpleStringProperty(name);
+                }
+                return new SimpleStringProperty("未知");
+            });
+            userCol.setMaxWidth(100);
+
+            // 2. 借出時間欄位
+            TableColumn<BorrowRecord, String> bDateCol = new TableColumn<>("借出時間");
+            bDateCol.setCellValueFactory(c -> new SimpleStringProperty(
+                    c.getValue().getBorrowDate() != null ? c.getValue().getBorrowDate().toString().replace("T", " ").substring(0, 16) : "-"));
+
+            // 3. 歸還時間欄位
+            TableColumn<BorrowRecord, String> rDateCol = new TableColumn<>("歸還時間");
+            rDateCol.setCellValueFactory(c -> new SimpleStringProperty(
+                    c.getValue().getReturnDate() != null ? c.getValue().getReturnDate().toString().replace("T", " ").substring(0, 16) : "借閱中（未歸還）"));
+
+            hTable.getColumns().addAll(userCol, bDateCol, rDateCol);
+            hTable.setPlaceholder(new Label("該書籍目前尚無任何歷史借閱紀錄。"));
+
+            VBox content = new VBox(hTable);
+            content.setPadding(new Insets(10));
+            dialog.getDialogPane().setContent(content);
+            dialog.showAndWait();
+        });
     }
 
     private void handleAsyncReturn() {

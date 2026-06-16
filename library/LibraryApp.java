@@ -2,7 +2,7 @@ package library;
 
 import javafx.application.Application;
 import javafx.stage.Stage;
-import library.gui.*;
+import library.src.gui.*;
 
 /**
  * 圖書館借還書系統 - JavaFX 入口點
@@ -13,8 +13,9 @@ public class LibraryApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         // 初始化資料庫與載入初始資料
-        library.database.DatabaseManager.initializeDatabase();
-        library.database.DataLoader.loadInitialData();
+        library.src.database.DatabaseManager.initializeDatabase();
+        library.src.database.DataLoader.loadInitialData();
+
 
         // 顯示登入畫面
         LoginView loginView = new LoginView(primaryStage);
@@ -25,3 +26,4 @@ public class LibraryApp extends Application {
         launch(args);
     }
 }
+

@@ -1,8 +1,8 @@
-package library.service;
+package library.src.service;
 
-import library.database.DatabaseManager;
-import library.model.*;
-import library.repository.*;
+import library.src.database.DatabaseManager;
+import library.src.model.*;
+import library.src.repository.*;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -30,7 +30,7 @@ public class BorrowService {
         // 1️⃣ 驗證使用者狀態與借閱限制規則 (提早驗證，減少 DB 負擔)
         User user = userRepository.findById(userId);
         if (user == null) {
-            return "❌ 系統錯誤：找不到該使用者帳號。";
+            return "❌系統錯誤：找不到該使用者帳號。";
         }
 
         if (user.getStatus() == UserStatus.SUSPENDED) {
@@ -43,7 +43,7 @@ public class BorrowService {
 
         int currentBorrowedCount = borrowRepository.countActiveBorrowsByUserId(userId);
         if (!user.canBorrow(currentBorrowedCount)) {
-            return "⚠️ 借閱失敗：已達到您該身分的最高借閱上限，請先還書後再借。";
+            return "⚠️借閱失敗：已達到您該身分的最高借閱上限，請先還書後再借。";
         }
 
         // 2️⃣ 執行強原子性交易更新
@@ -60,7 +60,7 @@ public class BorrowService {
                 int affectedRows = pstmt.executeUpdate();
                 if (affectedRows == 0) {
                     conn.rollback();
-                    return "⚠️ 借閱失敗：該書籍已被他人搶先借出或目前不可借。";
+                    return "⚠️借閱失敗：該書籍已被他人搶先借出或目前不可借。";
                 }
             }
 
@@ -78,7 +78,7 @@ public class BorrowService {
             if (conn != null) {
                 try {
                     conn.rollback();
-                    System.err.println("⚠️ 借書事務出錯，已安全回滾 (Rollback)。");
+                    System.err.println("⚠️借書事務出錯，已安全回滾 (Rollback)。");
                 } catch (SQLException ex) {
                     ex.printStackTrace();
                 }
@@ -96,14 +96,14 @@ public class BorrowService {
     }
 
     /**
-     * ✨ 核心功能 2：辦理還書交易（支援已預先產生罰金的更新機制）
+     * ✨ 核心功能 2：辦理還書交易（修復先繳罰金再還書導致重複停權的 Bug）
      */
     public String returnBook(int bookId) {
         Connection conn = null;
         try {
             BorrowRecord activeRecord = borrowRepository.findActiveRecordByBookId(bookId);
             if (activeRecord == null) {
-                return "❌ 系統錯誤：此書籍在紀錄中並未被借出。";
+                return "❌系統錯誤：此書籍在紀錄中並未被借出。";
             }
 
             conn = DatabaseManager.getConnection();
@@ -115,10 +115,10 @@ public class BorrowService {
             LocalDateTime returnDate = LocalDateTime.now();
             boolean isOverdue = returnDate.isAfter(activeRecord.getDueDate());
 
-            // 2. 更新借閱紀錄歸還時間與狀態 (修正了你原本的 getBorrowDays 語法錯誤)
+            // 2. 更新借閱紀錄歸還時間與狀態
             borrowRepository.updateReturnStatusInTransaction(conn, activeRecord.getRecordId(), returnDate, isOverdue);
 
-            // 3. 處理逾期罰款與停權邏輯
+            // 3. 處理逾期罰款與聯動停權邏輯
             if (isOverdue) {
                 activeRecord.hydrateHistoricalDates(activeRecord.getBorrowDate(), activeRecord.getDueDate(), returnDate);
 
@@ -127,25 +127,44 @@ public class BorrowService {
 
                 Fine newFine = new Fine(0, activeRecord);
 
-                // 💡 修正點：先檢查這筆借閱是不是已經被 FineService 預先產生過罰單了
-                String checkFineSql = "SELECT COUNT(*) FROM fines WHERE record_id = ?";
+                // 💡 優化點：同時檢查這筆罰單的「歷史金額」與「是否已繳清」
+                String checkFineSql = "SELECT amount, is_paid FROM fines WHERE record_id = ?";
+                int existingAmount = 0;
                 boolean fineExists = false;
+                boolean alreadyPaid = false;
+
                 try (PreparedStatement pstmtCheck = conn.prepareStatement(checkFineSql)) {
                     pstmtCheck.setInt(1, activeRecord.getRecordId());
                     try (java.sql.ResultSet rs = pstmtCheck.executeQuery()) {
-                        if (rs.next() && rs.getInt(1) > 0) fineExists = true;
+                        if (rs.next()) {
+                            fineExists = true;
+                            existingAmount = rs.getInt("amount");
+                            alreadyPaid = rs.getInt("is_paid") == 1;
+                        }
                     }
                 }
 
-                // 💡 修正點：有就 UPDATE，沒有就 INSERT
+                boolean needsSuspension = true; // 預設需要停權
+
                 if (fineExists) {
-                    String updateFineSql = "UPDATE fines SET amount = ? WHERE record_id = ?";
-                    try (PreparedStatement pstmtUpdate = conn.prepareStatement(updateFineSql)) {
-                        pstmtUpdate.setInt(1, newFine.getAmount());
-                        pstmtUpdate.setInt(2, activeRecord.getRecordId());
-                        pstmtUpdate.executeUpdate();
+                    if (newFine.getAmount() > existingAmount) {
+                        // 【狀況 A】新罰金大於舊金額（代表繳完罰金後又拖延了天數才還書）
+                        // 更新罰金金額，且因為金額增加，必須將繳款狀態重設為「未繳 (0)」
+                        String updateFineSql = "UPDATE fines SET amount = ?, is_paid = 0 WHERE record_id = ?";
+                        try (PreparedStatement pstmtUpdate = conn.prepareStatement(updateFineSql)) {
+                            pstmtUpdate.setInt(1, newFine.getAmount());
+                            pstmtUpdate.setInt(2, activeRecord.getRecordId());
+                            pstmtUpdate.executeUpdate();
+                        }
+                        needsSuspension = true;
+                    } else {
+                        // 【狀況 B】金額沒有變多（代表繳完當天立刻還書，或罰金已達系統上限）
+                        if (alreadyPaid) {
+                            needsSuspension = false; // 既然之前繳清了且無新罰金，就不需要停權！
+                        }
                     }
                 } else {
+                    // 【狀況 C】原本沒有預建罰單，第一次還書時現場產生
                     String insertFineSql = "INSERT INTO fines (record_id, amount, is_paid, created_at) VALUES (?, ?, 0, ?)";
                     try (PreparedStatement pstmtInsert = conn.prepareStatement(insertFineSql)) {
                         pstmtInsert.setInt(1, activeRecord.getRecordId());
@@ -153,13 +172,40 @@ public class BorrowService {
                         pstmtInsert.setString(3, returnDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                         pstmtInsert.executeUpdate();
                     }
+                    needsSuspension = true;
                 }
 
-                // 聯動停權：立刻將該學生狀態改為 SUSPENDED
-                String suspendSql = "UPDATE users SET status = 'SUSPENDED' WHERE user_id = ?";
-                try (PreparedStatement pstmtUser = conn.prepareStatement(suspendSql)) {
-                    pstmtUser.setInt(1, activeRecord.getUser().getUserId());
-                    pstmtUser.executeUpdate();
+                // 4. 智能動態聯動讀者狀態
+                if (needsSuspension) {
+                    // 確實有未繳罰金，執行停權
+                    String suspendSql = "UPDATE users SET status = 'SUSPENDED' WHERE user_id = ?";
+                    try (PreparedStatement pstmtUser = conn.prepareStatement(suspendSql)) {
+                        pstmtUser.setInt(1, activeRecord.getUser().getUserId());
+                        pstmtUser.executeUpdate();
+                    }
+                } else {
+                    // 💡 防呆安全機制：雖然這本書的罰金繳清了，但要確認他「名下有沒有其他逾期未繳的罰單」
+                    String checkOtherFinesSql = "SELECT COUNT(*) FROM fines f " +
+                            "JOIN borrow_records br ON f.record_id = br.record_id " +
+                            "WHERE br.user_id = ? AND f.is_paid = 0";
+                    boolean hasOtherUnpaid = false;
+                    try (PreparedStatement pstmtCheckOther = conn.prepareStatement(checkOtherFinesSql)) {
+                        pstmtCheckOther.setInt(1, activeRecord.getUser().getUserId());
+                        try (java.sql.ResultSet rs = pstmtCheckOther.executeQuery()) {
+                            if (rs.next() && rs.getInt(1) > 0) {
+                                hasOtherUnpaid = true;
+                            }
+                        }
+                    }
+
+                    // 如果名下全數繳清，沒有任何欠款，則確保帳號維持在 ACTIVE 啟用狀態
+                    if (!hasOtherUnpaid) {
+                        String activeSql = "UPDATE users SET status = 'ACTIVE' WHERE user_id = ?";
+                        try (PreparedStatement pstmtUser = conn.prepareStatement(activeSql)) {
+                            pstmtUser.setInt(1, activeRecord.getUser().getUserId());
+                            pstmtUser.executeUpdate();
+                        }
+                    }
                 }
 
                 conn.commit();
@@ -173,7 +219,7 @@ public class BorrowService {
                 try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
             }
             e.printStackTrace();
-            return "❌ 還書失敗，資料庫連線/操作異常。";
+            return "❌還書失敗，資料庫連線/操作異常。";
         } finally {
             if (conn != null) {
                 try {
@@ -183,6 +229,7 @@ public class BorrowService {
             }
         }
     }
+
     /**
      * ✨ 核心功能 3：查詢特定學生的目前借閱與歷史總紀錄
      */
@@ -196,5 +243,12 @@ public class BorrowService {
      */
     public List<BorrowRecord> getAllBorrowRecords(String studentNoFilter) {
         return borrowRepository.findAll(studentNoFilter);
+    }
+
+    /**
+     * ✨ 新增功能：查詢特定書籍的近期借還歷史紀錄
+     */
+    public List<BorrowRecord> getBookBorrowHistory(int bookId) {
+        return borrowRepository.findAllByBookId(bookId);
     }
 }

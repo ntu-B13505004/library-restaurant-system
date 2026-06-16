@@ -1,4 +1,4 @@
-package library.database;
+package library.src.database;
 
 import java.sql.*;
 
@@ -89,8 +89,8 @@ public class DatabaseManager {
                         pstmt.setString(2, "ADMIN001");
                         pstmt.setString(3, "系統管理員");
                         pstmt.setString(4, "admin123");
-                        pstmt.setString(5, library.model.UserRole.ADMIN.name());
-                        pstmt.setString(6, library.model.UserStatus.ACTIVE.name());
+                        pstmt.setString(5, library.src.model.UserRole.ADMIN.name());
+                        pstmt.setString(6, library.src.model.UserStatus.ACTIVE.name());
                         pstmt.setString(7, java.time.LocalDateTime.now().toString());
                         pstmt.executeUpdate();
                         System.out.println("🚩 系統成功補建管理員帳號：[ ADMIN001 ] (ID: 9999)");

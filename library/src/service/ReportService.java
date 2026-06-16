@@ -1,6 +1,6 @@
-package library.service;
+package library.src.service;
 
-import library.database.DatabaseManager;
+import library.src.database.DatabaseManager;
 import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,7 +37,7 @@ public class ReportService {
                 reportData.put(subject, count);
             }
         } catch (SQLException e) {
-            System.err.println("❌ 產生書籍主題借閱統計報表失敗");
+            System.err.println("❌產生書籍主題借閱統計報表失敗");
             e.printStackTrace();
         }
         return reportData;

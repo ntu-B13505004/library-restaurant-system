@@ -1,8 +1,8 @@
-package library.service;
+package library.src.service;
 
-import library.model.Book;
-import library.model.BookStatus;
-import library.repository.BookRepository;
+import library.src.model.Book;
+import library.src.model.BookStatus;
+import library.src.repository.BookRepository;
 
 import java.util.List;
 
@@ -37,7 +37,7 @@ public class BookService {
      */
     public boolean addBook(Book book) {
         if (book == null || book.getTitle() == null || book.getTitle().trim().isEmpty()) {
-            System.err.println("⚠️ 上架失敗：書籍標題不可為空。");
+            System.err.println("⚠️上架失敗：書籍標題不可為空。");
             return false;
         }
         return bookRepository.insert(book);
@@ -50,16 +50,30 @@ public class BookService {
     public boolean removeBook(int bookId) {
         Book book = bookRepository.findById(bookId);
         if (book == null) {
-            System.err.println("⚠️ 下架失敗：找不到該書籍 ID。");
+            System.err.println("⚠️下架失敗：找不到該書籍 ID。");
             return false;
         }
 
         // 核心業務規則：被借出的書不能直接從系統中抹除
         if (book.getStatus() == BookStatus.BORROWED) {
-            System.err.println("❌ 下架失敗：該書籍目前正被學生借閱中，無法執行下架。");
+            System.err.println("❌下架失敗：該書籍目前正被學生借閱中，無法執行下架。");
             return false;
         }
 
         return bookRepository.delete(bookId);
+    }
+
+    /**
+     * 5. ✨ 管理者功能：編輯更新書籍
+     */
+    public boolean updateBook(Book book) {
+        if (book == null || book.getBookId() <= 0) {
+            return false;
+        }
+        if (book.getTitle() == null || book.getTitle().trim().isEmpty()) {
+            System.err.println("⚠️更新失敗：書籍標題不可為空。");
+            return false;
+        }
+        return bookRepository.update(book);
     }
 }

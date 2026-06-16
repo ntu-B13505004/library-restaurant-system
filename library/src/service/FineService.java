@@ -1,11 +1,11 @@
-package library.service;
+package library.src.service;
 
-import library.model.BorrowRecord;
-import library.model.Fine;
-import library.model.UserStatus;
-import library.repository.BorrowRecordRepository;
-import library.repository.FineRepository;
-import library.repository.UserRepository;
+import library.src.model.BorrowRecord;
+import library.src.model.Fine;
+import library.src.model.UserStatus;
+import library.src.repository.BorrowRecordRepository;
+import library.src.repository.FineRepository;
+import library.src.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,7 +50,7 @@ public class FineService {
                 return existingFine;
             }
         } catch (Exception e) {
-            System.err.println("❌ 處理罰單紀錄失敗");
+            System.err.println("❌處理罰單紀錄失敗");
             e.printStackTrace();
             return null;
         }
@@ -64,10 +64,10 @@ public class FineService {
             Fine fine = fineRepository.findById(fineId);
 
             if (fine == null) {
-                return "❌ 系統錯誤：找不到該筆罰款紀錄。";
+                return "❌系統錯誤：找不到該筆罰款紀錄。";
             }
             if (fine.isPaid()) {
-                return "⚠️ 提示：此筆罰款先前已繳清，請勿重複繳納。";
+                return "⚠️提示：此筆罰款先前已繳清，請勿重複繳納。";
             }
 
             // 執行繳款（金額鎖定為繳款當下的累積值）
@@ -86,7 +86,7 @@ public class FineService {
             return "SUCCESS";
         } catch (Exception e) {
             e.printStackTrace();
-            return "❌ 資料庫更新失敗，繳費交易未完成。";
+            return "❌資料庫更新失敗，繳費交易未完成。";
         }
     }
 

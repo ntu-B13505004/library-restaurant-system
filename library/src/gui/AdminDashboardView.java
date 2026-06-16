@@ -1,5 +1,7 @@
-package library.gui;
+package library.src.gui;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -19,12 +21,11 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
-import library.model.*;
-import library.service.*;
+import library.src.model.*;
+import library.src.service.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class AdminDashboardView {
     private final Stage stage;
@@ -64,7 +65,7 @@ public class AdminDashboardView {
         sidebar.setPadding(new Insets(30, 20, 30, 20));
         sidebar.setStyle("-fx-background-color: " + AppStyle.PRIMARY + ";");
 
-        Label nameBadge = new Label(adminName + " 系統長");
+        Label nameBadge = new Label(adminName + " 系統 ");
         nameBadge.setFont(Font.font("System", FontWeight.BOLD, 18));
         nameBadge.setStyle("-fx-text-fill: white;");
         Label roleBadge = new Label("權限階級: SYSTEM_ADMIN");
@@ -73,11 +74,11 @@ public class AdminDashboardView {
         VBox profileBox = new VBox(5, nameBadge, roleBadge);
         profileBox.setPadding(new Insets(0, 0, 20, 0));
 
-        Button navReportBtn  = new Button("📊 營運數據報表");
-        Button navBookBtn    = new Button("📚 藏書維護與管理");
-        Button navUserBtn    = new Button("👥 讀者權限審查");
-        Button navRecordBtn  = new Button("📜 全館借閱與罰款");
-        Button logoutBtn     = new Button("🚪 登出系統");
+        Button navReportBtn  = new Button("📊營運數據報表");
+        Button navBookBtn    = new Button("📚藏書維護與管理");
+        Button navUserBtn    = new Button("👥讀者權限審查");
+        Button navRecordBtn  = new Button("📜全館借閱與罰款");
+        Button logoutBtn     = new Button("🚪登出系統");
 
         Button[] navButtons = {navReportBtn, navBookBtn, navUserBtn, navRecordBtn, logoutBtn};
         for (Button btn : navButtons) {
@@ -109,7 +110,7 @@ public class AdminDashboardView {
 
         Scene scene = new Scene(mainLayout, 1150, 720);
         stage.setScene(scene);
-        stage.setTitle("智慧圖書館 - 最高權限管理後台");
+        stage.setTitle("管理後台");
         stage.show();
     }
 
@@ -152,10 +153,10 @@ public class AdminDashboardView {
         kpiGrid.add(createKpiCard("未收罰金", "$ " + finesSummary.getOrDefault("未繳罰款總金額", 0), "#D35400", "#E74C3C"), 3, 0);
 
         // 下排：深度罰金財務與違規追蹤 (配紫、深紅、綠色側條)
-        kpiGrid.add(createKpiCard("逾期未還筆數", String.valueOf(finesSummary.getOrDefault("逾期未還筆數", 0)), "#8E44AD", "#9B59B6"), 0, 1);
-        kpiGrid.add(createKpiCard("未繳罰款件數", String.valueOf(finesSummary.getOrDefault("未繳罰款件數", 0)), "#962D22", "#C0392B"), 1, 1);
-        kpiGrid.add(createKpiCard("本月已收罰金", "$ " + finesSummary.getOrDefault("本月已收罰款金額", 0), "#27AE60", "#2ECC71"), 2, 1);
-        kpiGrid.add(createKpiCard("累計已收罰金", "$ " + finesSummary.getOrDefault("累計已收罰款金額", 0), "#1E8449", "#27AE60"), 3, 1);
+        //kpiGrid.add(createKpiCard("逾期未還筆數", String.valueOf(finesSummary.getOrDefault("逾期未還筆數", 0)), "#8E44AD", "#9B59B6"), 0, 1);
+        //kpiGrid.add(createKpiCard("未繳罰款件數", String.valueOf(finesSummary.getOrDefault("未繳罰款件數", 0)), "#962D22", "#C0392B"), 1, 1);
+        //kpiGrid.add(createKpiCard("本月已收罰金", "$ " + finesSummary.getOrDefault("本月已收罰款金額", 0), "#27AE60", "#2ECC71"), 2, 1);
+        //kpiGrid.add(createKpiCard("累計已收罰金", "$ " + finesSummary.getOrDefault("累計已收罰款金額", 0), "#1E8449", "#27AE60"), 3, 1);
 
         // 圖表區
         HBox chartBox = new HBox(20);
@@ -254,20 +255,33 @@ public class AdminDashboardView {
         TextField tTitle  = new TextField(); tTitle.setPromptText("新書書名");  tTitle.setStyle(AppStyle.textField());
         TextField tAuthor = new TextField(); tAuthor.setPromptText("作者");     tAuthor.setStyle(AppStyle.textField());
         TextField tSubject= new TextField(); tSubject.setPromptText("主題");    tSubject.setStyle(AppStyle.textField());
+
         Button addBtn = new Button("➕ 登記上架");
         addBtn.setStyle(AppStyle.buttonPrimary());
         addBtn.setOnAction(e -> handleAsyncAddBook(
                 tTitle.getText(), tAuthor.getText(), tSubject.getText(), tTitle, tAuthor, tSubject));
+
+        // ✨ ✨ 新增：【借閱歷史】按鈕 ✨ ✨
+        Button historyBtn = new Button("📜 借閱歷史");
+        historyBtn.setStyle(AppStyle.buttonSecondary());
+        historyBtn.setOnAction(e -> handleShowBookHistory()); // 綁定點擊事件
+
+        // ✨ 新增：編輯書籍按鈕
+        Button editBtn = new Button("✏️ 編輯選定書籍");
+        editBtn.setStyle(AppStyle.buttonSecondary());
+        editBtn.setOnAction(e -> handleEditBook());
+
         Button delBtn = new Button("🗑️ 下架選定書籍");
         delBtn.setStyle("-fx-background-color: #E74C3C; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;");
         delBtn.setOnAction(e -> handleAsyncRemoveBook());
 
         Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
-        opsBox.getChildren().addAll(tTitle, tAuthor, tSubject, addBtn, sp, delBtn);
+
+        // ✨ 將 historyBtn 塞入 opsBox 之中
+        opsBox.getChildren().addAll(tTitle, tAuthor, tSubject, addBtn, historyBtn, editBtn, sp, delBtn);
         box.getChildren().addAll(header, searchBox, bookTable, new Separator(), opsBox);
         return box;
     }
-
     // ==========================================
     // 👥 讀者權限審查
     // ==========================================
@@ -364,9 +378,9 @@ public class AdminDashboardView {
         HBox filterBox = new HBox(10);
         filterBox.setAlignment(Pos.CENTER_LEFT);
         TextField filterField = new TextField();
-        filterField.setPromptText("輸入學號以連動過濾借閱與罰單...");
+        filterField.setPromptText("輸入學號或姓名以連動過濾借閱與罰單......");
         filterField.setStyle(AppStyle.textField());
-        filterField.setPrefWidth(260);
+        filterField.setPrefWidth(280);
 
         Button filterBtn = new Button("🔍 條件檢索");
         filterBtn.setStyle(AppStyle.buttonSecondary());
@@ -386,9 +400,15 @@ public class AdminDashboardView {
         globalBorrowTable.setPrefHeight(210);
         globalBorrowTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        TableColumn<BorrowRecord, String> bUserCol = new TableColumn<>("借閱人 (學號)");
-        bUserCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().getUser().getStudentNo()));
+        TableColumn<BorrowRecord, String> bUserCol = new TableColumn<>("借閱人 (姓名/學號)");
+        bUserCol.setCellValueFactory(c -> {
+            User u = c.getValue().getUser();
+            // ✨ 同時顯示姓名與學號，並做防空保護
+            String name = u.getName() != null ? u.getName() : "未知";
+            String sno = u.getStudentNo() != null ? u.getStudentNo() : "未知";
+            return new SimpleStringProperty(name + " (" + sno + ")");
+        });
+        bUserCol.setPrefWidth(150); // 設定適當寬度
 
         TableColumn<BorrowRecord, String> bBookCol = new TableColumn<>("借閱書籍");
         bBookCol.setCellValueFactory(c ->
@@ -440,10 +460,16 @@ public class AdminDashboardView {
         globalFineTable.setPrefHeight(190);
         globalFineTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        TableColumn<Fine, String> fUserCol = new TableColumn<>("違規學號");
-        fUserCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().getRecord().getUser().getStudentNo()));
-        fUserCol.setMaxWidth(120);
+// ---- 修改罰款表格的違規讀者欄位 ----
+        TableColumn<Fine, String> fUserCol = new TableColumn<>("違規讀者 (姓名/學號)");
+        fUserCol.setCellValueFactory(c -> {
+            User u = c.getValue().getRecord().getUser();
+            // ✨ 同樣同時顯示姓名與學號
+            String name = u.getName() != null ? u.getName() : "未知";
+            String sno = u.getStudentNo() != null ? u.getStudentNo() : "未知";
+            return new SimpleStringProperty(name + " (" + sno + ")");
+        });
+        fUserCol.setPrefWidth(150);
 
         TableColumn<Fine, String> fBookCol2 = new TableColumn<>("違規書籍");
         fBookCol2.setCellValueFactory(c ->
@@ -510,47 +536,96 @@ public class AdminDashboardView {
     // ==========================================
     private void asyncLoadBooks(String keyword) {
         if (bookTable == null) return;
+
+        // 1. 啟動載入動畫
         bookTable.setPlaceholder(new ProgressIndicator());
+
         Task<List<Book>> task = new Task<>() {
             @Override protected List<Book> call() {
                 return bookService.searchBooks(keyword);
             }
         };
-        task.setOnSucceeded(e -> booksData.setAll(task.getValue()));
+
+        // 2. 成功取得資料後的處理
+        task.setOnSucceeded(e -> {
+            List<Book> result = task.getValue();
+            booksData.setAll(result);
+
+            // ✨ 防空轉機制 1：如果查無結果，將佔位符換成文字，把轉圈圈換掉
+            if (result.isEmpty()) {
+                bookTable.setPlaceholder(new Label("查無符合條件的書籍。"));
+            }
+        });
+
+        // 3. ✨ 防空轉機制 2：後端崩潰處理，捕捉異常並停止轉圈圈
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            if (ex != null) ex.printStackTrace(); // 在後台印出錯誤堆疊方便除錯
+
+            bookTable.setPlaceholder(new Label("資料載入失敗。"));
+            showAlert("系統錯誤", "查詢書籍時發生異常，請聯絡系統管理員。");
+        });
+
         new Thread(task).start();
     }
-
     private void asyncLoadUsers(String keyword) {
         if (userTable == null) return;
+
         userTable.setPlaceholder(new ProgressIndicator());
+
         Task<List<Map<String, Object>>> task = new Task<>() {
             @Override protected List<Map<String, Object>> call() {
                 return userService.getAllStudents(keyword);
             }
         };
-        task.setOnSucceeded(e -> usersData.setAll(task.getValue()));
+
+        task.setOnSucceeded(e -> {
+            List<Map<String, Object>> result = task.getValue();
+            usersData.setAll(result);
+
+            // ✨ 查無資料時拔除 ProgressIndicator
+            if (result.isEmpty()) {
+                userTable.setPlaceholder(new Label("查無符合條件的讀者。"));
+            }
+        });
+
+        // ✨ 防止 SQL/NullPointer 異常導致卡死
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            if (ex != null) ex.printStackTrace();
+
+            userTable.setPlaceholder(new Label("資料載入失敗。"));
+            showAlert("系統錯誤", "查詢讀者時發生異常，請聯絡系統管理員。");
+        });
+
         new Thread(task).start();
     }
-
-    private void asyncLoadRecords(String studentNoFilter) {
+    private void asyncLoadRecords(String keyword) {
         if (globalBorrowTable != null) globalBorrowTable.setPlaceholder(new ProgressIndicator());
         if (globalFineTable   != null) globalFineTable.setPlaceholder(new ProgressIndicator());
 
         Task<Void> task = new Task<>() {
             @Override protected Void call() {
-                // 1. 取得符合學號過濾的借閱歷史
-                List<BorrowRecord> borrows = borrowService.getAllBorrowRecords(studentNoFilter);
-
-                // 2. 取得全館未繳罰單
+                // 借閱紀錄過濾 (⚠️ 記得後端 BorrowService 那邊也要改成支援姓名模糊查詢喔)
+                List<BorrowRecord> borrows = borrowService.getAllBorrowRecords(keyword);
                 List<Fine> allFines = fineService.getAllUnpaidFines();
 
-                // ✅ 核心改進：利用 Java Stream API，根據學號關鍵字即時過濾罰單清單
                 final List<Fine> filteredFines;
-                if (studentNoFilter != null && !studentNoFilter.trim().isEmpty()) {
-                    String cleanFilter = studentNoFilter.trim().toLowerCase();
+                if (keyword != null && !keyword.trim().isEmpty()) {
+                    String cleanFilter = keyword.trim().toLowerCase();
+
+                    // ✨ 升級 Stream 過濾器：同時比對學號與姓名
                     filteredFines = allFines.stream()
-                            .filter(f -> f.getRecord() != null && f.getRecord().getUser() != null
-                                    && f.getRecord().getUser().getStudentNo().toLowerCase().contains(cleanFilter))
+                            .filter(f -> {
+                                if (f.getRecord() == null || f.getRecord().getUser() == null) return false;
+                                User u = f.getRecord().getUser();
+
+                                String sno = u.getStudentNo() != null ? u.getStudentNo().toLowerCase() : "";
+                                String name = u.getName() != null ? u.getName().toLowerCase() : "";
+
+                                // 只要學號或姓名其中一個包含關鍵字，就保留該筆罰單
+                                return sno.contains(cleanFilter) || name.contains(cleanFilter);
+                            })
                             .collect(Collectors.toList());
                 } else {
                     filteredFines = allFines;
@@ -559,16 +634,27 @@ public class AdminDashboardView {
                 Platform.runLater(() -> {
                     globalBorrowsData.setAll(borrows);
                     globalFinesData.setAll(filteredFines);
+
                     if (globalBorrowTable != null) globalBorrowTable.setPlaceholder(new Label("無符合條件之借閱紀錄。"));
                     if (globalFineTable   != null) globalFineTable.setPlaceholder(new Label("目前無符合條件之未繳罰款。"));
                 });
                 return null;
             }
         };
-        new Thread(task).start();
-    }
 
-    // ==========================================
+        task.setOnFailed(e -> {
+            Throwable ex = task.getException();
+            if (ex != null) ex.printStackTrace();
+
+            Platform.runLater(() -> {
+                if (globalBorrowTable != null) globalBorrowTable.setPlaceholder(new Label("借閱紀錄載入失敗。"));
+                if (globalFineTable != null) globalFineTable.setPlaceholder(new Label("罰款清單載入失敗。"));
+                showAlert("系統錯誤", "查詢全館紀錄時發生異常，請聯絡系統管理員。");
+            });
+        });
+
+        new Thread(task).start();
+    }    // ==========================================
     // 事件處理
     // ==========================================
     private void handleAsyncAddBook(String title, String author, String subject, TextField... fields) {
@@ -696,6 +782,173 @@ public class AdminDashboardView {
         new Thread(task).start();
     }
 
+    // ==========================================
+    // ✨ 新增功能：異步查詢特定書籍的借閱歷史與狀態
+    // ==========================================
+    private void handleShowBookHistory() {
+        // 1. 檢查管理員有沒有選中表格中的某一本書
+        Book selected = bookTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("提示", "請先從上方列表中選取一本藏書。");
+            return;
+        }
+
+        // 2. 建立異步背景任務，防止查詢大數據時 UI 畫面凍結卡死
+        Task<String> task = new Task<>() {
+            @Override protected String call() {
+                // 撈出全館所有借閱紀錄
+                List<BorrowRecord> allRecords = borrowService.getAllBorrowRecords("");
+
+                // 利用 Java Stream API 篩選出 book_id 相同的紀錄
+                List<BorrowRecord> bookHistory = allRecords.stream()
+                        .filter(r -> r.getBook() != null && r.getBook().getBookId() == selected.getBookId())
+                        .collect(Collectors.toList());
+
+                // 若完全沒有人借過
+                if (bookHistory.isEmpty()) {
+                    return "💡該書籍目前在系統中尚無任何借閱紀錄。";
+                }
+
+                // 開始優美地排版文字內容
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("📚書名：《%s》 (ID: %d)\n", selected.getTitle(), selected.getBookId()));
+                sb.append(String.format("👤作者：%s\n", selected.getAuthors()));
+                sb.append("=======================================\n\n");
+
+                int count = 1;
+                for (BorrowRecord r : bookHistory) {
+                    String returnStatus;
+                    if (r.getReturnDate() != null) {
+                        returnStatus = r.isOverdue() ? "已歸還（曾逾期）" : "✅已按時歸還";
+                    } else {
+                        returnStatus = r.isOverdue() ? "⚠️逾期未還（已變紅單）" : "🔷讀者借閱中";
+                    }
+
+                    sb.append(String.format("[%d] 借閱讀者：%s (%s)\n", count++, r.getUser().getName(), r.getUser().getStudentNo()));
+                    sb.append(String.format("    借閱期間：%s ➜ %s\n",
+                            r.getBorrowDate().toString().substring(0, 10),
+                            r.getDueDate().toString().substring(0, 10)));
+                    sb.append(String.format("    實際歸還：%s\n",
+                            r.getReturnDate() != null ? r.getReturnDate().toString().substring(0, 10) : "尚未歸還"));
+                    sb.append(String.format("    目前狀態：%s\n", returnStatus));
+                    sb.append("------------------------------------------\n");
+                }
+                return sb.toString();
+            }
+        };
+
+        // 3. 任務執行成功後，自動在 JavaFX UI 執行緒彈出精美報告
+        task.setOnSucceeded(e -> {
+            showAlert("書籍借閱歷史追蹤", task.getValue());
+        });
+
+        // 4. 開闢新執行緒啟動任務
+        new Thread(task).start();
+    }
+
+
+    // ==========================================
+    // ✨ 新增功能：處理點擊編輯書籍按鈕
+    // ==========================================
+    private void handleEditBook() {
+        Book selected = bookTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showAlert("提示", "請先從上方列表中選取要編輯的書籍。");
+            return;
+        }
+        openEditBookDialog(selected);
+    }
+
+    // ==========================================
+    // ✨ 新增功能：開啟全欄位編輯視窗
+    // ==========================================
+    private void openEditBookDialog(Book book) {
+        Dialog<Book> dialog = new Dialog<>();
+        dialog.setTitle("編輯書籍資料");
+        dialog.setHeaderText("正在修改書籍 ID: " + book.getBookId());
+
+        ButtonType saveButtonType = new ButtonType("儲存修改", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 50, 10, 10));
+
+        // 建立所有欄位的輸入框並填入舊資料
+        TextField titleField = new TextField(book.getTitle());
+        TextField authorField = new TextField(book.getAuthors());
+        TextField subjectsField = new TextField(book.getSubjects());
+        TextField publisherField = new TextField(book.getPublisher());
+        TextField yearField = new TextField(book.getPublishYear());
+        TextField editionField = new TextField(book.getEdition());
+        TextField formatField = new TextField(book.getFormatDesc());
+        TextField sourceField = new TextField(book.getSource());
+        TextField noteField = new TextField(book.getNote());
+
+        // ISBN 列表轉換為逗號分隔字串
+        String isbnsStr = book.getIsbns() != null ? String.join(", ", book.getIsbns()) : "";
+        TextField isbnsField = new TextField(isbnsStr);
+        isbnsField.setPromptText("多筆 ISBN 請以逗號分隔");
+        isbnsField.setPrefWidth(250);
+
+        // 排版加入對話框
+        grid.add(new Label("書名:"), 0, 0);       grid.add(titleField, 1, 0);
+        grid.add(new Label("作者:"), 0, 1);       grid.add(authorField, 1, 1);
+        grid.add(new Label("主題:"), 0, 2);       grid.add(subjectsField, 1, 2);
+        grid.add(new Label("出版者:"), 0, 3);     grid.add(publisherField, 1, 3);
+        grid.add(new Label("出版年:"), 0, 4);     grid.add(yearField, 1, 4);
+        grid.add(new Label("版本:"), 0, 5);       grid.add(editionField, 1, 5);
+        grid.add(new Label("格式:"), 0, 6);       grid.add(formatField, 1, 6);
+        grid.add(new Label("來源:"), 0, 7);       grid.add(sourceField, 1, 7);
+        grid.add(new Label("附註:"), 0, 8);       grid.add(noteField, 1, 8);
+        grid.add(new Label("ISBN(s):"), 0, 9);   grid.add(isbnsField, 1, 9);
+
+        dialog.getDialogPane().setContent(grid);
+
+        // 將輸入框的內容寫回物件
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == saveButtonType) {
+                book.setTitle(titleField.getText());
+                book.setAuthors(authorField.getText());
+                book.setSubjects(subjectsField.getText());
+                book.setPublisher(publisherField.getText());
+                book.setPublishYear(yearField.getText());
+                book.setEdition(editionField.getText());
+                book.setFormatDesc(formatField.getText());
+                book.setSource(sourceField.getText());
+                book.setNote(noteField.getText());
+
+                // 將逗號分隔的字串拆解回 List
+                List<String> newIsbns = Arrays.stream(isbnsField.getText().split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList());
+                book.setIsbns(newIsbns);
+
+                return book;
+            }
+            return null;
+        });
+
+        // 處理非同步存檔
+        dialog.showAndWait().ifPresent(updatedBook -> {
+            Task<Boolean> task = new Task<>() {
+                @Override protected Boolean call() {
+                    return bookService.updateBook(updatedBook);
+                }
+            };
+            task.setOnSucceeded(e -> {
+                if (task.getValue()) {
+                    showAlert("成功", "書籍資料已成功更新！");
+                    asyncLoadBooks(""); // 更新成功後重新整理表格
+                } else {
+                    showAlert("失敗", "更新書籍資料失敗。");
+                }
+            });
+            new Thread(task).start();
+        });
+    }
     private void showAlert(String title, String content) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.INFORMATION, content, ButtonType.OK);

@@ -1,9 +1,9 @@
-package library.repository;
+package library.src.repository;
 
-import library.database.DatabaseManager;
-import library.model.Book;
-import library.model.BorrowRecord;
-import library.model.User;
+import library.src.database.DatabaseManager;
+import library.src.model.Book;
+import library.src.model.BorrowRecord;
+import library.src.model.User;
 
 import java.sql.*;
 import java.time.LocalDateTime;
@@ -158,25 +158,35 @@ public class BorrowRecordRepository {
      * ✨ 6. 查詢全體借閱紀錄（支援學號模糊/精確過濾）
      * 供 AdminDashboardView 借還紀錄查詢使用
      */
-    public List<BorrowRecord> findAll(String studentNoFilter) {
+    /**
+     * ✨ 6. 查詢全體借閱紀錄（升級：支援學號與姓名雙欄位模糊/精確過濾）
+     * 供 AdminDashboardView 借還紀錄查詢使用
+     */
+    public List<BorrowRecord> findAll(String keyword) {
         List<BorrowRecord> records = new ArrayList<>();
 
-        // 利用 JOIN 關聯 users 表，以便透過 student_no 進行篩選
+        // 利用 JOIN 關聯 users 表，以便透過 student_no 或 name 進行篩選
         StringBuilder sql = new StringBuilder(
                 "SELECT r.* FROM borrow_records r " +
                         "JOIN users u ON r.user_id = u.user_id "
         );
 
-        if (studentNoFilter != null && !studentNoFilter.trim().isEmpty()) {
-            sql.append("WHERE u.student_no LIKE ? ");
+        boolean hasKeyword = keyword != null && !keyword.trim().isEmpty();
+
+        if (hasKeyword) {
+            // ✨ 核心升級：同時比對學號與姓名
+            sql.append("WHERE u.student_no LIKE ? OR u.name LIKE ? ");
         }
         sql.append("ORDER BY r.borrow_date DESC");
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
 
-            if (studentNoFilter != null && !studentNoFilter.trim().isEmpty()) {
-                pstmt.setString(1, "%" + studentNoFilter.trim() + "%");
+            if (hasKeyword) {
+                // 將關鍵字前後加上 % 以支援模糊搜尋
+                String searchString = "%" + keyword.trim() + "%";
+                pstmt.setString(1, searchString); // 給 student_no 比對
+                pstmt.setString(2, searchString); // ✨ 給 name 比對
             }
 
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -185,12 +195,11 @@ public class BorrowRecordRepository {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("❌ 查詢全體借還紀錄失敗");
+            System.err.println("❌查詢全體借還紀錄失敗");
             e.printStackTrace();
         }
         return records;
-    }
-    /**
+    }    /**
      * 🛠️ 輔助方法：將資料庫欄位，拼裝轉換回強型別的物件組合
      */
     private static BorrowRecord mapResultSetToRecord(ResultSet rs) throws SQLException {

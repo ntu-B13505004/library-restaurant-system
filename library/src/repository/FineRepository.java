@@ -1,10 +1,10 @@
-package library.repository;
+package library.src.repository;
 
-import library.database.DatabaseManager;
-import library.model.Book;
-import library.model.BorrowRecord;
-import library.model.Fine;
-import library.model.User;
+import library.src.database.DatabaseManager;
+import library.src.model.Book;
+import library.src.model.BorrowRecord;
+import library.src.model.Fine;
+import library.src.model.User;
 
 import java.sql.*;
 import java.time.LocalDateTime;
