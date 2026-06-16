@@ -15,34 +15,34 @@
 
 ```
 restaurant/
-└── src/
-    ├── enums/
-    │   ├── MemberTier.java       會員等級與折扣規則
-    │   ├── OrderStatus.java      訂單狀態
-    │   └── TableNumber.java      桌號與外帶
-    ├── model/
-    │   ├── MenuItem.java         餐點資料
-    │   ├── Member.java           會員資料
-    │   ├── OrderDetail.java      訂單明細（單項餐點）
-    │   └── Order.java            訂單
-    ├── service/
-    │   ├── MenuService.java      菜單管理邏輯
-    │   ├── MemberService.java    會員管理邏輯
-    │   ├── OrderService.java     訂單管理邏輯
-    │   └── ReportService.java    報表邏輯
-    ├── ui/
-    │   ├── OrderingFrame.java    客人點餐視窗（主視窗）
-    │   ├── AdminFrame.java       後台管理視窗
-    │   ├── OrderPanel.java       後台－訂單管理分頁
-    │   ├── MenuManagePanel.java  後台－菜單管理分頁
-    │   ├── MemberPanel.java      後台－會員列表分頁
-    │   └── ReportPanel.java      後台－今日報表分頁
-    ├── persistence/
-    │   ├── CsvMemberRepository.java    會員CSV讀取儲存
-    │   └── CsvMenuRepository.java      菜單CSV讀取儲存
-    ├── OrderStatus.java          訂單狀態
-    ├── TableNumber.java          桌號／外帶
-    └── Main.java                 程式進入點
+├── src/
+│   ├── enums/
+│   │   ├── MemberTier.java       會員等級與折扣規則
+│   │   ├── OrderStatus.java      訂單狀態
+│   │   └── TableNumber.java      桌號與外帶
+│   ├── model/
+│   │   ├── MenuItem.java         餐點資料
+│   │   ├── Member.java           會員資料
+│   │   ├── OrderDetail.java      訂單明細（單項餐點）
+│   │   └── Order.java            訂單
+│   ├── service/
+│   │   ├── MenuService.java      菜單管理邏輯
+│   │   ├── MemberService.java    會員管理邏輯
+│   │   ├── OrderService.java     訂單管理邏輯
+│   │   └── ReportService.java    報表邏輯
+│   ├── ui/
+│   │   ├── OrderingFrame.java    客人點餐視窗（主視窗）
+│   │   ├── AdminFrame.java       後台管理視窗
+│   │   ├── OrderPanel.java       後台－訂單管理分頁
+│   │   ├── MenuManagePanel.java  後台－菜單管理分頁
+│   │   ├── MemberPanel.java      後台－會員列表分頁
+│   │   └── ReportPanel.java      後台－今日報表分頁
+│   └── persistence/
+│       ├── CsvMemberRepository.java    會員CSV讀取儲存
+│       └── CsvMenuRepository.java      菜單CSV讀取儲存
+├── OrderStatus.java          訂單狀態
+├── TableNumber.java          桌號／外帶
+└── Main.java                 程式進入點
 ```
 
 ---
