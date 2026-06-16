@@ -1,218 +1,167 @@
-# 餐廳點餐管理系統 README
+# 餐廳點餐管理系統
+
+> 第10組｜工海二 張馨予 陳釗熒 劉如恩  
+> 使用語言：Java｜介面：Java Swing
+
 ---
 
-## 📁 專案結構
+## 專案簡介
+
+以物件導向設計（OOP）實作的餐廳點餐管理系統，支援客人點餐與後台管理兩大功能，並整合會員折扣制度與消費報表。
+
+---
+
+## 專案結構
 
 ```
 restaurant/
 └── src/
     ├── enums/
-    │   ├── OrderStatus.java     # 訂單狀態
-    │   ├── TableNumber.java     # 桌號／外帶
-    │   └── MemberTier.java      # 會員等級與折扣
+    │   ├── MemberTier.java       會員等級與折扣規則
+    │   ├── OrderStatus.java      訂單狀態
+    │   └── TableNumber.java      桌號與外帶
     ├── model/
-    │   ├── MenuItem.java        # 餐點資料
-    │   ├── Member.java          # 會員資料
-    │   ├── OrderDetail.java     # 訂單明細（單項餐點）
-    │   └── Order.java           # 訂單
+    │   ├── MenuItem.java         餐點資料
+    │   ├── Member.java           會員資料
+    │   ├── OrderDetail.java      訂單明細（單項餐點）
+    │   └── Order.java            訂單
     ├── service/
-    │   ├── MenuService.java     # 菜單管理
-    │   ├── MemberService.java   # 會員管理
-    │   ├── OrderService.java    # 訂單管理
-    │   └── ReportService.java   # 報表
-    └── Main.java                # ⬅ 介面在這裡寫
+    │   ├── MenuService.java      菜單管理邏輯
+    │   ├── MemberService.java    會員管理邏輯
+    │   ├── OrderService.java     訂單管理邏輯
+    │   └── ReportService.java    報表邏輯
+    ├── ui/
+    │   ├── OrderingFrame.java    客人點餐視窗（主視窗）
+    │   ├── AdminFrame.java       後台管理視窗
+    │   ├── OrderPanel.java       後台－訂單管理分頁
+    │   ├── MenuManagePanel.java  後台－菜單管理分頁
+    │   ├── MemberPanel.java      後台－會員列表分頁
+    │   └── ReportPanel.java      後台－今日報表分頁
+    ├── persistence/
+    │   ├── CsvMemberRepository.java    會員CSV讀取儲存
+    │   └── CsvMenuRepository.java      菜單CSV讀取儲存
+    ├── OrderStatus.java          訂單狀態
+    ├── TableNumber.java          桌號／外帶
+    └── Main.java                 程式進入點
 ```
 
 ---
 
-## 🗂️ Enum 說明
+## 系統架構
 
-### `OrderStatus`（訂單狀態）
-| 常數 | 顯示名稱 |
-|------|---------|
-| `PENDING` | 未接單 |
-| `PREPARING` | 製作中 |
-| `COMPLETED` | 已完成 |
-
-```java
-order.getStatus().getDisplayName(); // 取得中文名稱
+```
+客人點餐介面 (OrderingFrame)
+        │
+        ▼
+   OrderService ──► MemberService（消費後自動升級）
+        │
+        ▼
+後台管理介面 (AdminFrame)
+   ├── OrderPanel      查看訂單、更新狀態
+   ├── MenuManagePanel 新增／刪除／改價／售完
+   ├── MemberPanel     查看所有會員
+   └── ReportPanel     今日營業額、熱銷排行
 ```
 
-### `TableNumber`（桌號）
-| 常數 | 說明 |
+---
+
+## 功能說明
+
+### 客人點餐（OrderingFrame）
+
+| 功能 | 說明 |
 |------|------|
-| `TABLE_1` ~ `TABLE_10` | 內用 1～10 號桌 |
-| `TAKEOUT` | 外帶 |
+| 菜單卡片 | 顯示所有供應中的餐點，點擊即可加入購物車 |
+| 購物車 | 可直接在表格內修改數量與備註，小計自動更新 |
+| 選擇桌號 | 從 1～10 號桌或外帶中選擇 |
+| 會員查詢 | 輸入電話查詢，查無資料可當場註冊 |
+| 結帳 | 自動套用會員折扣，送出後清空購物車 |
 
-```java
-table.getDisplayName(); // "3號桌" 或 "外帶"
-table.isDineIn();       // true = 內用, false = 外帶
-```
+### 後台管理（AdminFrame）
 
-### `MemberTier`（會員等級）
+| 分頁 | 功能 |
+|------|------|
+| 訂單管理 | 查看所有訂單，選取後可更新為「製作中」或「已完成」 |
+| 菜單管理 | 新增餐點、修改價格、設定售完／恢復供應、刪除餐點 |
+| 會員管理 | 查看所有會員的等級與累積消費 |
+| 今日報表 | 計算今日營業額（已完成訂單）與熱銷排行 |
+
+---
+
+## 會員制度
+
+### 等級與折扣
+
 | 等級 | 升級門檻（累積消費） | 一般折扣 | 生日當月 |
 |------|-------------------|---------|---------|
-| `BRONZE` 銅卡 | $0 起 | 95折 | 無額外優惠 |
-| `SILVER` 銀卡 | $500 起 | 9折 | 再疊加 95折 → **85.5折** |
-| `GOLD` 金卡 | $1000 起 | 85折 | 再疊加 95折 → **80.75折** |
+| 銅卡 | $0 起 | 95折 | 無額外優惠 |
+| 銀卡 | $500 起 | 9折 | 再疊加 95折 → 85.5折 |
+| 金卡 | $1000 起 | 85折 | 再疊加 95折 → 80.75折 |
+
+### 規則說明
+- 新會員加入即為銅卡，等級依**累積消費總金額**自動升級
+- 生日優惠限銀卡、金卡，以**生日月份**判定
+- 折扣計算後以 `Math.round()` 四捨五入至整數
 
 ---
 
-## 📦 Model 說明
+## 資料類別說明
 
 ### `MenuItem`（餐點）
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `itemId` | int | 自動產生，不可修改 |
-| `itemName` | String | 餐點名稱，不可修改 |
-| `price` | int | 價格，可透過 `MenuService.updatePrice()` 修改 |
-| `category` | String | 分類（例：主餐、飲料） |
-| `isSoldOut` | boolean | 售完狀態，預設 false |
-| `isDeleted` | boolean | 軟刪除，預設 false |
+| itemId | int | 自動產生，不可修改 |
+| itemName | String | 餐點名稱 |
+| price | int | 價格 |
+| category | String | 分類（例：主餐、飲料） |
+| isSoldOut | boolean | 售完狀態，預設 false |
+| isDeleted | boolean | 軟刪除，預設 false |
 
 ### `Member`（會員）
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `memberId` | int | 自動產生 |
-| `name` | String | 姓名 |
-| `phone` | String | 電話（不可重複） |
-| `birthMonth` | int | 生日月份 1～12 |
-| `birthDate` | int | 生日日期 |
-| `totalSpent` | int | 累積消費金額 |
-| `tier` | MemberTier | 等級，根據 totalSpent 自動升級 |
-
-```java
-member.isBirthdayMonth(currentMonth); // 判斷是否為生日月
-```
-
-### `OrderDetail`（訂單明細）
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `detailId` | int | 自動產生 |
-| `item` | MenuItem | 餐點物件 |
-| `quantity` | int | 數量 |
-| `note` | String | 備註（可為空字串） |
-| `subtotal` | int | 小計，建立時自動計算（price × quantity） |
+| memberId | int | 自動產生 |
+| name | String | 姓名 |
+| phone | String | 電話（不可重複） |
+| birthMonth | int | 生日月份 1～12 |
+| birthDate | int | 生日日期 1～31 |
+| totalSpent | int | 累積消費金額 |
+| tier | MemberTier | 等級，自動升級 |
 
 ### `Order`（訂單）
 | 欄位 | 型別 | 說明 |
 |------|------|------|
-| `orderId` | int | 自動產生 |
-| `orderTime` | LocalDateTime | 建立時自動記錄 |
-| `status` | OrderStatus | 預設 PENDING |
-| `table` | TableNumber | 桌號或外帶 |
-| `member` | Member | 可為 null（非會員） |
-| `details` | List\<OrderDetail\> | 訂單內所有品項 |
-| `totalAmount` | int | 原價（自動計算） |
-| `finalAmount` | int | 實付金額（含折扣，由 OrderService 寫入） |
+| orderId | int | 自動產生 |
+| orderTime | LocalDateTime | 建立時自動記錄 |
+| status | OrderStatus | 預設 PENDING |
+| table | TableNumber | 桌號或外帶 |
+| member | Member | 可為 null（非會員） |
+| details | List\<OrderDetail\> | 訂單內所有品項 |
+| totalAmount | int | 原價（自動計算） |
+| finalAmount | int | 實付金額（含折扣） |
 
 ---
 
-## ⚙️ Service 說明
+## 啟動方式
 
-### `MenuService`（菜單管理）
-
-```java
-MenuService menuService = new MenuService();
-
-menuService.addMenuItem("牛肉麵", 120, "主餐");   // 新增餐點，回傳 MenuItem
-menuService.removeMenuItem(1);                    // 軟刪除
-menuService.updatePrice(1, 130);                  // 修改價格
-menuService.setSoldOut(1, true);                  // 設定售完
-menuService.setSoldOut(1, false);                 // 恢復供應
-
-menuService.getAvailableItems();  // 前台用：只回傳未售完、未刪除的餐點
-menuService.getAllItems();         // 後台用：含售完，不含已刪除
-menuService.findById(1);          // 用 ID 查餐點
-menuService.printMenu();          // 印出完整菜單
-```
-
-### `MemberService`（會員管理）
+### 初始化（Main.java）
 
 ```java
+MenuService   menuService   = new MenuService();
 MemberService memberService = new MemberService();
-
-memberService.registerMember("小明", "0912345678", 3, 20);  // 姓名、電話、生日月份、生日日期
-memberService.findMemberByPhone("0912345678");              // 查詢，找不到回傳 null
-memberService.updateTotalSpent(member, 500);                // 累加消費，自動觸發升級判斷
-memberService.getAllMembers();                              // 取得所有會員
-memberService.printAllMembers();                            // 印出會員列表
-```
-
-### `OrderService`（訂單管理）
-
-```java
-OrderService orderService = new OrderService();
-
-// Step 1：建立明細
-OrderDetail d1 = orderService.createDetail(menuItem, 2, "不要辣");
-OrderDetail d2 = orderService.createDetail(menuItem2, 1, "");
-
-// Step 2：打包成 List
-List<OrderDetail> details = new ArrayList<>();
-details.add(d1);
-details.add(d2);
-
-// Step 3：建立訂單（member 可傳 null = 非會員）
-Order order = orderService.createOrder(TableNumber.TABLE_3, member, details);
-
-// 更新狀態
-orderService.updateOrderStatus(1, OrderStatus.PREPARING);
-orderService.updateOrderStatus(1, OrderStatus.COMPLETED);
-
-orderService.getAllOrders();                       // 所有訂單
-orderService.getOrdersByStatus(OrderStatus.PENDING); // 篩選狀態
-orderService.findById(1);                          // 用 ID 查訂單
-```
-
-> ⚠️ **注意**：訂單建立後 `OrderService` 會自動計算折扣並寫入 `finalAmount`，不需要手動呼叫折扣計算。
-
-### `ReportService`（報表）
-
-```java
-// 初始化時需傳入 orderService
+OrderService  orderService  = new OrderService();
 ReportService reportService = new ReportService(orderService);
 
-reportService.calculateTodayRevenue();             // 今日營業額
-reportService.calculateRevenue(LocalDate.of(2025, 6, 1)); // 指定日期營業額
-reportService.showBestSellingItems();              // 熱銷排行（只算已完成訂單）
+// 啟動點餐主視窗
+new OrderingFrame(menuService, memberService, orderService, reportService);
 ```
+
+> ⚠️ `ReportService` 需傳入 `orderService` 才能讀取訂單資料。
 
 ---
 
-## 🖥️ Main.java 初始化方式
+## 注意事項
 
-```java
-import service.*;
-
-public class Main {
-    public static void main(String[] args) {
-        MenuService   menuService   = new MenuService();
-        MemberService memberService = new MemberService();
-        OrderService  orderService  = new OrderService();
-        ReportService reportService = new ReportService(orderService); // 注意需傳入 orderService
-
-        // 介面從這裡開始寫
-    }
-}
-```
-
----
-
-## 📋 前端介面需要實作的功能
-
-### 客人點餐介面
-1. **選擇桌號** — 從 `TableNumber` 列舉中選，`TABLE_1`～`TABLE_10` 或 `TAKEOUT`
-2. **查看菜單** — 呼叫 `menuService.getAvailableItems()`
-3. **加入購物車** — 每個品項呼叫 `orderService.createDetail(item, qty, note)`，加入 `List<OrderDetail>`
-4. **選擇是否使用會員** — 呼叫 `memberService.findMemberByPhone(phone)`，找不到則傳 `null`
-5. **送出訂單** — 呼叫 `orderService.createOrder(table, member, details)`
-
-### 後台管理介面
-1. **查看訂單** — `orderService.getAllOrders()` 或 `getOrdersByStatus()`
-2. **更新訂單狀態** — `orderService.updateOrderStatus(orderId, newStatus)`
-3. **新增／刪除／修改餐點** — `MenuService` 各方法
-4. **設定售完** — `menuService.setSoldOut(itemId, true/false)`
-5. **查看今日營業額** — `reportService.calculateTodayRevenue()`
-6. **熱銷排行** — `reportService.showBestSellingItems()`
-7. **查看會員** — `memberService.getAllMembers()`
+- **軟刪除**：餐點刪除後資料仍保留，不影響歷史訂單的顯示
+- **報表只計算已完成訂單**：`OrderStatus.COMPLETED` 的訂單才納入營業額與熱銷排行
+- **會員升級自動觸發**：每次結帳後呼叫 `memberService.updateTotalSpent()`，內部自動判斷是否升級
