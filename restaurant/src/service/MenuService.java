@@ -86,6 +86,21 @@ public class MenuService {
         return null;
     }
 
+    // CSV 載入用：直接加入已還原的 MenuItem 物件（不走 addMenuItem 流程）
+    public void loadMenuItem(MenuItem item) {
+        menu.add(item);
+    }
+
+    // CSV 載入用：還原正確的下一個 id
+    public void setNextItemId(int id) {
+        this.nextItemId = id;
+    }
+
+    // 取得所有餐點（含已刪除，給 CSV 存檔用）
+    public List<MenuItem> getAllItemsIncludeDeleted() {
+        return menu;
+    }
+
     // 印出菜單
     public void printMenu() {
         List<MenuItem> all = getAllItems();

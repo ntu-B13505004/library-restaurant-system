@@ -40,9 +40,9 @@ restaurant/
 │   └── persistence/
 │       ├── CsvMemberRepository.java    會員CSV讀取儲存
 │       └── CsvMenuRepository.java      菜單CSV讀取儲存
-├── OrderStatus.java          訂單狀態
-├── TableNumber.java          桌號／外帶
-└── Main.java                 程式進入點
+├── member.csv                    會員資料
+├── menu.csv                      菜單資料
+└── Main.java                     程式進入點
 ```
 
 ---
@@ -50,17 +50,25 @@ restaurant/
 ## 系統架構
 
 ```
-客人點餐介面 (OrderingFrame)
-        │
-        ▼
-   OrderService ──► MemberService（消費後自動升級）
-        │
-        ▼
-後台管理介面 (AdminFrame)
-   ├── OrderPanel      查看訂單、更新狀態
-   ├── MenuManagePanel 新增／刪除／改價／售完
-   ├── MemberPanel     查看所有會員
-   └── ReportPanel     今日營業額、熱銷排行
+啟動
+ │
+ ├── CSV 載入（menu.csv / member.csv）
+ │
+ ▼
+OrderingFrame（客人點餐主視窗）
+ ├── 菜單卡片（點擊加入購物車）
+ ├── 購物車（可編輯數量與備註）
+ ├── 選桌號 / 查詢或註冊會員
+ ├── 結帳（自動套用折扣、更新累積消費）
+ └── ⚙ 後台管理 ──► AdminFrame
+                      ├── 訂單管理
+                      ├── 菜單管理
+                      ├── 會員列表
+                      └── 今日報表
+ │
+關閉視窗
+ │
+ └── CSV 自動存檔（menu.csv / member.csv）
 ```
 
 ---
@@ -71,11 +79,12 @@ restaurant/
 
 | 功能 | 說明 |
 |------|------|
-| 菜單卡片 | 顯示所有供應中的餐點，點擊即可加入購物車 |
+| 菜單卡片 | 顯示所有供應中的餐點，點擊輸入數量後加入購物車 |
 | 購物車 | 可直接在表格內修改數量與備註，小計自動更新 |
+| 重新整理菜單 | 手動刷新菜單卡片，同步後台對菜單的修改 |
 | 選擇桌號 | 從 1～10 號桌或外帶中選擇 |
 | 會員查詢 | 輸入電話查詢，查無資料可當場註冊 |
-| 結帳 | 自動套用會員折扣，送出後清空購物車 |
+| 結帳 | 自動套用會員折扣，顯示原價與實付，送出後清空購物車 |
 
 ### 後台管理（AdminFrame）
 
@@ -83,7 +92,7 @@ restaurant/
 |------|------|
 | 訂單管理 | 查看所有訂單，選取後可更新為「製作中」或「已完成」 |
 | 菜單管理 | 新增餐點、修改價格、設定售完／恢復供應、刪除餐點 |
-| 會員管理 | 查看所有會員的等級與累積消費 |
+| 會員管理 | 查看所有會員的等級、生日與累積消費 |
 | 今日報表 | 計算今日營業額（已完成訂單）與熱銷排行 |
 
 ---
@@ -95,73 +104,79 @@ restaurant/
 | 等級 | 升級門檻（累積消費） | 一般折扣 | 生日當月 |
 |------|-------------------|---------|---------|
 | 銅卡 | $0 起 | 95折 | 無額外優惠 |
-| 銀卡 | $500 起 | 9折 | 再疊加 95折 → 85.5折 |
-| 金卡 | $1000 起 | 85折 | 再疊加 95折 → 80.75折 |
+| 銀卡 | $500 起 | 9折 | 再疊加 95折 → **85.5折** |
+| 金卡 | $1000 起 | 85折 | 再疊加 95折 → **80.75折** |
 
-### 規則說明
-- 新會員加入即為銅卡，等級依**累積消費總金額**自動升級
+### 規則
+- 新會員加入即為銅卡，依**累積消費總金額**自動升級，無法降級
 - 生日優惠限銀卡、金卡，以**生日月份**判定
-- 折扣計算後以 `Math.round()` 四捨五入至整數
+- 折扣計算後以 `Math.round()` 四捨五入至整數元
 
 ---
 
-## 資料類別說明
+## 資料儲存（CSV）
 
-### `MenuItem`（餐點）
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| itemId | int | 自動產生，不可修改 |
-| itemName | String | 餐點名稱 |
-| price | int | 價格 |
-| category | String | 分類（例：主餐、飲料） |
-| isSoldOut | boolean | 售完狀態，預設 false |
-| isDeleted | boolean | 軟刪除，預設 false |
+程式啟動時自動從 CSV 載入資料，關閉視窗時自動存檔，不需手動操作。
 
-### `Member`（會員）
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| memberId | int | 自動產生 |
-| name | String | 姓名 |
-| phone | String | 電話（不可重複） |
-| birthMonth | int | 生日月份 1～12 |
-| birthDate | int | 生日日期 1～31 |
-| totalSpent | int | 累積消費金額 |
-| tier | MemberTier | 等級，自動升級 |
+### `menu.csv` 欄位順序
+```
+itemId, itemName, price, category, isSoldOut, isDeleted
+```
 
-### `Order`（訂單）
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| orderId | int | 自動產生 |
-| orderTime | LocalDateTime | 建立時自動記錄 |
-| status | OrderStatus | 預設 PENDING |
-| table | TableNumber | 桌號或外帶 |
-| member | Member | 可為 null（非會員） |
-| details | List\<OrderDetail\> | 訂單內所有品項 |
-| totalAmount | int | 原價（自動計算） |
-| finalAmount | int | 實付金額（含折扣） |
+### `member.csv` 欄位順序
+```
+memberId, name, phone, birthMonth, birthDate, totalSpent, tier
+```
+
+> ⚠️ 不建議手動編輯 CSV 檔案，格式錯誤會導致載入失敗。
 
 ---
 
 ## 啟動方式
 
-### 初始化（Main.java）
+### 環境需求
+- Java 17 以上
 
+### 編譯與執行
+```bash
+# 編譯（在 src/ 目錄下）
+javac -d out enums/*.java model/*.java service/*.java persistence/*.java ui/*.java Main.java
+
+# 執行
+java -cp out Main
+```
+
+### Main.java 初始化流程
 ```java
+// 1. 建立 Service
 MenuService   menuService   = new MenuService();
 MemberService memberService = new MemberService();
 OrderService  orderService  = new OrderService();
 ReportService reportService = new ReportService(orderService);
 
-// 啟動點餐主視窗
-new OrderingFrame(menuService, memberService, orderService, reportService);
-```
+// 2. 載入 CSV
+CsvMenuRepository   menuRepo   = new CsvMenuRepository();
+CsvMemberRepository memberRepo = new CsvMemberRepository();
+menuRepo.load(menuService);
+memberRepo.load(memberService);
 
-> ⚠️ `ReportService` 需傳入 `orderService` 才能讀取訂單資料。
+// 3. 關閉時自動存檔
+Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+    menuRepo.save(menuService.getAllItemsIncludeDeleted());
+    memberRepo.save(memberService.getAllMembers());
+}));
+
+// 4. 啟動介面
+SwingUtilities.invokeLater(() ->
+    new OrderingFrame(menuService, memberService, orderService, reportService)
+);
+```
 
 ---
 
 ## 注意事項
 
-- **軟刪除**：餐點刪除後資料仍保留，不影響歷史訂單的顯示
-- **報表只計算已完成訂單**：`OrderStatus.COMPLETED` 的訂單才納入營業額與熱銷排行
-- **會員升級自動觸發**：每次結帳後呼叫 `memberService.updateTotalSpent()`，內部自動判斷是否升級
+- **軟刪除**：餐點刪除後資料仍保留於 CSV，不影響歷史訂單顯示
+- **報表只計算已完成訂單**：需將訂單狀態更新至 `COMPLETED` 才會納入營業額與熱銷排行
+- **訂單不持久化**：訂單資料僅存於記憶體，重新啟動程式後會清空
+- **前台菜單需手動刷新**：後台修改菜單後，點擊前台「重新整理菜單」按鈕才會同步

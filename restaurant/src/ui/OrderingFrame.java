@@ -64,16 +64,20 @@ public class OrderingFrame extends JFrame {
 
     // ── 頂部：後台按鈕 ──────────────────────
     private JPanel buildTopPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
-        JButton adminBtn = new JButton("⚙ 後台管理");
-        adminBtn.addActionListener(e ->
-            new AdminFrame(menuService, memberService, orderService, reportService)
-        );
+    JButton refreshBtn = new JButton("↻ 重新整理菜單");  // 新增這個
+    JButton adminBtn   = new JButton("⚙ 後台管理");
 
-        panel.add(adminBtn);
-        return panel;
-    }
+    refreshBtn.addActionListener(e -> refreshMenu());    // 新增這個
+    adminBtn.addActionListener(e ->
+        new AdminFrame(menuService, memberService, orderService, reportService)
+    );
+
+    panel.add(refreshBtn);  // 新增這個
+    panel.add(adminBtn);
+    return panel;
+}
 
     // ── 中央：菜單卡片 ──────────────────────
     private JScrollPane buildMenuPanel() {

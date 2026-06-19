@@ -17,8 +17,8 @@ public class MemberService {
             return null;
         }
         // 檢查生日月份是否合法
-        if (!MonthDateValid(birthMonth, birthDate)) {
-            System.out.println("❌ 生日無效：" + birthMonth + "/" + birthDate);
+        if (birthMonth < 1 || birthMonth > 12) {
+            System.out.println("❌ 生日月份無效：" + birthMonth);
             return null;
         }
         Member member = new Member(nextMemberId++, name, phone, birthMonth, birthDate);
@@ -54,6 +54,16 @@ public class MemberService {
         }
     }
 
+    // CSV 載入用：直接加入已還原的 Member 物件（不走 register 流程）
+    public void loadMember(Member member) {
+        members.add(member);
+    }
+
+    // CSV 載入用：還原正確的下一個 id
+    public void setNextMemberId(int id) {
+        this.nextMemberId = id;
+    }
+
     // 取得所有會員
     public List<Member> getAllMembers() {
         return members;
@@ -70,25 +80,5 @@ public class MemberService {
             System.out.println(m);
         }
         System.out.println("═════════════════════");
-    }
-
-    // helper:　確認生日有效
-    public boolean MonthDateValid(int m, int d){
-        if( m>0 && m<12 && d>0){
-            if(m==2){
-                if(d<30){
-                    return true;
-                }
-            }else if(m==4||m==6||m==9||m==11){
-                if(d<31){
-                    return true;
-                }
-            }else{
-                if(d<32){
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }
